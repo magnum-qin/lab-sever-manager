@@ -5,8 +5,8 @@ A lightweight GPU lab monitoring dashboard for a Windows Tailscale jump host and
 The project has three pieces:
 
 - Linux agent: runs on each GPU server at `127.0.0.1:18180` and exposes current CPU, memory, disk, per-user home usage, GPU, VRAM, users, and process data.
-- SSH tunnels: run on the Windows jump host and map one local port per server to the Linux agent.
-- Dashboard: runs on the Windows jump host at `0.0.0.0:18080` and reads the tunnel ports every 2 seconds.
+- Direct pull: the Windows jump host reads each Linux Go agent directly over HTTP with `X-Agent-Token`.
+- Dashboard: runs on the Windows jump host at `0.0.0.0:18080` and reads each configured host every 2 seconds.
 
 Current lab dashboard URL: `http://100.99.99.99:18080/`
 
@@ -16,7 +16,7 @@ Current lab dashboard URL: `http://100.99.99.99:18080/`
 config/hosts.example.json        Example host inventory and tunnel ports
 jump_host/gpu_dashboard.py       Dashboard HTTP server and frontend UI
 jump_host/start_gpu_dashboard.cmd Start dashboard on Windows jump host
-jump_host/start_gpu_tunnels.cmd  Start persistent SSH local tunnels
+jump_host/start_gpu_tunnels.cmd  Legacy migration note; direct mode does not need tunnels
 jump_host/install_scheduled_tasks.cmd Register dashboard/tunnels on Windows logon
 linux_agent/gpu_status_agent.py  Local HTTP agent for each Linux host
 linux_agent/dashboard_probe.sh   Probe script using nvidia-smi, free, ps, /proc
@@ -56,7 +56,7 @@ jump_host\install_scheduled_tasks.cmd
 
 It creates two user-level scheduled tasks:
 
-- `GPUStatusTunnels`: starts SSH local tunnels at logon.
+- `GPUStatusTunnels`: not required in direct pull mode.
 - `GPUStatusDashboard`: starts the dashboard at logon.
 
 ## Data Flow
@@ -75,9 +75,10 @@ flowchart LR
 
 ## Notes
 
-- The Linux agent binds only to `127.0.0.1` by default. It is exposed only through SSH tunnels.
+- The Linux agent binds to `0.0.0.0:18180` in direct pull mode and requires `X-Agent-Token: suzuki-lab`.
 - The dashboard updates data in place. It does not reload the full page every polling cycle.
 - The process list is grouped by user and uses light per-user colors for readability.\n- Disk volume usage is collected with `df`; per-user `/home` usage is collected with `du` and cached for 5 minutes to avoid filesystem pressure.
 - If a host is unreachable, the dashboard shows it as `down` with the tunnel or HTTP error.
+
 
 

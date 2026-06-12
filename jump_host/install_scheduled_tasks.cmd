@@ -1,6 +1,6 @@
 @echo off
 setlocal
-schtasks /Create /TN GPUStatusTunnels /SC ONLOGON /TR "\"%~dp0start_gpu_tunnels.cmd\"" /F
 schtasks /Create /TN GPUStatusDashboard /SC ONLOGON /TR "\"%~dp0start_gpu_dashboard.cmd\"" /F
-echo Installed GPUStatusTunnels and GPUStatusDashboard scheduled tasks.
+echo Installed GPUStatusDashboard scheduled task.
+echo GPUStatusTunnels is not needed in direct agent mode.
 endlocal

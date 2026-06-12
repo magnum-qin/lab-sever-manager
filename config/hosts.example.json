@@ -4,56 +4,50 @@
                       "bind_port":  18080,
                       "poll_seconds":  2,
                       "agent_port":  18180,
-                      "ssh_user":  "g24tka12"
+                      "ssh_user":  "g24tka12",
+                      "agent_token":  "suzuki-lab",
+                      "access_mode":  "direct"
                   },
     "hosts":  [
                   {
                       "name":  "a6000-143",
                       "ip":  "192.168.2.143",
-                      "group":  "A6000",
-                      "local_port":  18143
+                      "group":  "A6000"
                   },
                   {
                       "name":  "a6000-144",
                       "ip":  "192.168.2.151",
-                      "group":  "A6000",
-                      "local_port":  18144
+                      "group":  "A6000"
                   },
                   {
                       "name":  "a6000-048",
                       "ip":  "172.23.4.48",
-                      "group":  "A6000",
-                      "local_port":  18048
+                      "group":  "A6000"
                   },
                   {
                       "name":  "a6000-147",
                       "ip":  "172.23.4.53",
-                      "group":  "A6000",
-                      "local_port":  18147
+                      "group":  "A6000"
                   },
                   {
                       "name":  "a6000-155",
                       "ip":  "192.168.2.155",
-                      "group":  "A6000",
-                      "local_port":  18155
+                      "group":  "A6000"
                   },
                   {
                       "name":  "rtx4090-224",
                       "ip":  "192.168.2.152",
-                      "group":  "RTX 4090",
-                      "local_port":  18224
+                      "group":  "RTX 4090"
                   },
                   {
                       "name":  "rtx4090-56",
                       "ip":  "172.23.4.56",
-                      "group":  "RTX 4090",
-                      "local_port":  18056
+                      "group":  "RTX 4090"
                   },
                   {
                       "name":  "rtx4090-47",
                       "ip":  "172.23.4.47",
-                      "group":  "RTX 4090",
-                      "local_port":  18047
+                      "group":  "RTX 4090"
                   }
               ]
 }

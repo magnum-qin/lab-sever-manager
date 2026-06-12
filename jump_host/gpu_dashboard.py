@@ -5,7 +5,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = Path(os.environ.get("LAB_MANAGER_CONFIG", BASE_DIR / "config" / "hosts.json"))
@@ -13,7 +13,7 @@ if not CONFIG_PATH.exists():
     CONFIG_PATH = BASE_DIR / "config" / "hosts.example.json"
 
 DEFAULT_CONFIG = {
-    "dashboard": {"bind_host": "0.0.0.0", "bind_port": 18080, "poll_seconds": 2, "agent_port": 18180},
+    "dashboard": {"bind_host": "0.0.0.0", "bind_port": 18080, "poll_seconds": 2, "agent_port": 18180, "agent_token": ""},
     "hosts": [],
 }
 
@@ -37,7 +37,7 @@ HTML = r'''<!doctype html>
   </style>
 </head>
 <body>
-<div class="shell"><aside><div class="brand"><div class="mark">G</div><span>GPU Ops</span></div><div class="nav"><span class="active">Overview</span><span>A6000 Cluster</span><span>RTX 4090 Cluster</span><span>Processes</span><span>Tunnels</span></div><div class="side-card"><strong>Live agent mode</strong>Status is read through persistent local SSH tunnels on the Windows jump host.</div></aside><main><div class="topbar"><div><h1>GPU Server Dashboard</h1><div class="subtitle">Live utilization, memory pressure, and process ownership across the lab fleet.</div></div><div class="actions"><div class="pill"><span class="dot"></span><span id="meta">Loading</span></div><div class="pill">Refresh <span id="poll">2</span>s</div></div></div><section class="panel"><div class="panel-head"><div class="panel-title">Server details</div><div class="panel-subtitle">CPU, memory, disk, GPU, VRAM, users, per-user disk, and processes</div></div><div id="table"></div></section></main></div>
+<div class="shell"><aside><div class="brand"><div class="mark">G</div><span>GPU Ops</span></div><div class="nav"><span class="active">Overview</span><span>A6000 Cluster</span><span>RTX 4090 Cluster</span><span>Processes</span><span>Tunnels</span></div><div class="side-card"><strong>Live agent mode</strong>Status is read directly from token-protected Go agents on the GPU hosts.</div></aside><main><div class="topbar"><div><h1>GPU Server Dashboard</h1><div class="subtitle">Live utilization, memory pressure, and process ownership across the lab fleet.</div></div><div class="actions"><div class="pill"><span class="dot"></span><span id="meta">Loading</span></div><div class="pill">Refresh <span id="poll">2</span>s</div></div></div><section class="panel"><div class="panel-head"><div class="panel-title">Server details</div><div class="panel-subtitle">CPU, memory, disk, GPU, VRAM, users, per-user disk, and processes</div></div><div id="table"></div></section></main></div>
 <script>
 const meta=document.getElementById("meta"),table=document.getElementById("table"),poll=document.getElementById("poll");const expanded=new Set(),rows=new Map();let latest=null;const palette=[["#eef6ff","#2f6fed"],["#effaf4","#13a56f"],["#fff7e8","#c98212"],["#f5f0ff","#7b61ff"],["#fff1f5","#d84b7a"],["#eefaf9","#0e9f9a"],["#f4f6fa","#60708a"],["#fff4ef","#d46b3d"]];
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}function pct(a,b){return b?Math.max(0,Math.min(100,a*100/b)):0}function mb(v){return v>=1024?(v/1024).toFixed(1)+" GB":(v||0)+" MB"}function st(h){if(h.error||!h.gpu)return"down";const m=pct(h.gpu.mem_used_mb||0,h.gpu.mem_total_mb||0),c=h.cpu?(h.cpu.util_pct??pct(h.cpu.load1,h.cpu.cpus)):0;return(h.gpu.util_gpu>=50||m>=50||c>=70)?"busy":"ok"}function cls(el,c){if(el&&el.className!==c)el.className=c}function html(el,v){if(el&&el.innerHTML!==v)el.innerHTML=v}function userColor(u){let h=0;for(const ch of String(u||""))h=((h<<5)-h+ch.charCodeAt(0))|0;return palette[Math.abs(h)%palette.length]}
@@ -63,7 +63,7 @@ def load_config():
     hosts = []
     for h in data.get("hosts", []):
         item = dict(h)
-        item["port"] = int(item.get("local_port", item.get("port", dashboard["agent_port"])))
+        item["port"] = int(item.get("agent_port", item.get("port", dashboard["agent_port"])))
         hosts.append(item)
     return dashboard, hosts
 
@@ -145,7 +145,11 @@ def get_status():
     def fetch(h):
         item = dict(h)
         try:
-            with urlopen(f"http://127.0.0.1:{h['port']}/status", timeout=18) as resp:
+            req = Request(f"http://{h['ip']}:{h['port']}/status")
+            token = dashboard.get("agent_token", "")
+            if token:
+                req.add_header("X-Agent-Token", token)
+            with urlopen(req, timeout=18) as resp:
                 text = resp.read().decode("utf-8", errors="replace")
             if "__GPU__" in text:
                 return parse_output(item, text)
@@ -188,6 +192,7 @@ if __name__ == "__main__":
     server = ThreadingHTTPServer((dashboard["bind_host"], int(dashboard["bind_port"])), Handler)
     print(f"Serving dashboard on http://{dashboard['bind_host']}:{dashboard['bind_port']} using {CONFIG_PATH}")
     server.serve_forever()
+
 
 
 
