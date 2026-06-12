@@ -2,7 +2,7 @@
 set -u
 
 USER_DISK_CACHE="${TMPDIR:-/tmp}/gpu_status_user_disk.cache"
-USER_DISK_TTL="${USER_DISK_TTL:-300}"
+USER_DISK_MAX_AGE="${USER_DISK_MAX_AGE:-3600}"
 
 echo __HOST__
 hostname
@@ -25,16 +25,9 @@ cache_mtime=0
 if [ -f "$USER_DISK_CACHE" ]; then
   cache_mtime=$(stat -c %Y "$USER_DISK_CACHE" 2>/dev/null || echo 0)
 fi
-if [ ! -f "$USER_DISK_CACHE" ] || [ $((now - cache_mtime)) -ge "$USER_DISK_TTL" ]; then
-  tmp_cache="$USER_DISK_CACHE.$$"
-  timeout 5s sh -c 'du -sm /home/* 2>/dev/null | sort -nr | head -40 | awk "{n=\$2; sub(\"/home/\",\"\",n); print n \",\" \$1}"' > "$tmp_cache" 2>/dev/null
-  if [ -s "$tmp_cache" ]; then
-    mv "$tmp_cache" "$USER_DISK_CACHE"
-  else
-    rm -f "$tmp_cache"
-  fi
+if [ -f "$USER_DISK_CACHE" ] && [ $((now - cache_mtime)) -le "$USER_DISK_MAX_AGE" ]; then
+  cat "$USER_DISK_CACHE" 2>/dev/null || true
 fi
-cat "$USER_DISK_CACHE" 2>/dev/null || true
 
 echo __LOAD__
 awk '{print $1","$2","$3}' /proc/loadavg | tr -d '\n'
@@ -57,6 +50,4 @@ idle_delta=$((idle2 - idle1))
 awk -v total="$total_delta" -v idle="$idle_delta" 'BEGIN{if(total>0){printf "%.1f\n", (total-idle)*100/total}else{print "0.0"}}'
 
 echo __TOP__
-ps -eo pid,user,pcpu,pmem,rss,comm,args --sort=-pcpu | awk 'NR>1 && NR<=16 {print}'
-
-
+ps -eo pid,user,pcpu,pmem,rss,comm,args --sort=-pcpu | awk 'NR>1 && $0 !~ /du -sm \/home/ && NR<=24 {print}' | head -16
