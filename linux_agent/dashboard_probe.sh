@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -u
 
+USER_DISK_CACHE="${TMPDIR:-/tmp}/gpu_status_user_disk.cache"
+USER_DISK_TTL="${USER_DISK_TTL:-300}"
+
 echo __HOST__
 hostname
 
@@ -12,6 +15,26 @@ timeout 5s nvidia-smi --query-compute-apps=pid,process_name,used_memory --format
 
 echo __MEM__
 free -m | awk 'NR==2{print $2","$3","$7}'
+
+echo __DISK__
+df -BM -x tmpfs -x devtmpfs -x squashfs --output=source,target,size,used,avail,pcent 2>/dev/null | awk 'NR>1{gsub(/M$/,"",$3);gsub(/M$/,"",$4);gsub(/M$/,"",$5);gsub(/%$/,"",$6);print $1","$2","$3","$4","$5","$6}'
+
+echo __USER_DISK__
+now=$(date +%s)
+cache_mtime=0
+if [ -f "$USER_DISK_CACHE" ]; then
+  cache_mtime=$(stat -c %Y "$USER_DISK_CACHE" 2>/dev/null || echo 0)
+fi
+if [ ! -f "$USER_DISK_CACHE" ] || [ $((now - cache_mtime)) -ge "$USER_DISK_TTL" ]; then
+  tmp_cache="$USER_DISK_CACHE.$$"
+  timeout 5s sh -c 'du -sm /home/* 2>/dev/null | sort -nr | head -40 | awk "{n=\$2; sub(\"/home/\",\"\",n); print n \",\" \$1}"' > "$tmp_cache" 2>/dev/null
+  if [ -s "$tmp_cache" ]; then
+    mv "$tmp_cache" "$USER_DISK_CACHE"
+  else
+    rm -f "$tmp_cache"
+  fi
+fi
+cat "$USER_DISK_CACHE" 2>/dev/null || true
 
 echo __LOAD__
 awk '{print $1","$2","$3}' /proc/loadavg | tr -d '\n'
@@ -35,4 +58,5 @@ awk -v total="$total_delta" -v idle="$idle_delta" 'BEGIN{if(total>0){printf "%.1
 
 echo __TOP__
 ps -eo pid,user,pcpu,pmem,rss,comm,args --sort=-pcpu | awk 'NR>1 && NR<=16 {print}'
+
 

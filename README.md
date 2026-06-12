@@ -4,7 +4,7 @@ A lightweight GPU lab monitoring dashboard for a Windows Tailscale jump host and
 
 The project has three pieces:
 
-- Linux agent: runs on each GPU server at `127.0.0.1:18180` and exposes current CPU, memory, GPU, VRAM, users, and process data.
+- Linux agent: runs on each GPU server at `127.0.0.1:18180` and exposes current CPU, memory, disk, per-user home usage, GPU, VRAM, users, and process data.
 - SSH tunnels: run on the Windows jump host and map one local port per server to the Linux agent.
 - Dashboard: runs on the Windows jump host at `0.0.0.0:18080` and reads the tunnel ports every 2 seconds.
 
@@ -77,6 +77,7 @@ flowchart LR
 
 - The Linux agent binds only to `127.0.0.1` by default. It is exposed only through SSH tunnels.
 - The dashboard updates data in place. It does not reload the full page every polling cycle.
-- The process list is grouped by user and uses light per-user colors for readability.
+- The process list is grouped by user and uses light per-user colors for readability.\n- Disk volume usage is collected with `df`; per-user `/home` usage is collected with `du` and cached for 5 minutes to avoid filesystem pressure.
 - If a host is unreachable, the dashboard shows it as `down` with the tunnel or HTTP error.
+
 
