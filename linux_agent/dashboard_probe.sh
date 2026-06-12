@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -u
 
 echo __HOST__
@@ -35,3 +35,4 @@ awk -v total="$total_delta" -v idle="$idle_delta" 'BEGIN{if(total>0){printf "%.1
 
 echo __TOP__
 ps -eo pid,user,pcpu,pmem,rss,comm,args --sort=-pcpu | awk 'NR>1 && NR<=16 {print}'
+
