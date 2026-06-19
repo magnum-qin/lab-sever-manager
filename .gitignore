@@ -1,10 +1,14 @@
-﻿__pycache__/
+__pycache__/
 *.py[cod]
 *.log
 .env
 config/hosts.json
+config/hosts.local.json
 .DS_Store
 .vscode/
-
 .tools/
 dist/
+node_modules/
+apps/dashboard-web/dist/
+apps/dashboard-web/.vite/
+*.tsbuildinfo

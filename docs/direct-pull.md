@@ -11,7 +11,7 @@ Each Linux GPU host runs the Go agent on:
 The agent requires this request header:
 
 ```text
-X-Agent-Token: suzuki-lab
+X-Agent-Token: <your-token>
 ```
 
 The Windows jump-host dashboard directly requests each host:
@@ -20,7 +20,7 @@ The Windows jump-host dashboard directly requests each host:
 http://<host-ip>:18180/status
 ```
 
-The agent still collects data only when `/status` is requested. It does not continuously scan the machine in the background.
+The agent collects live CPU, memory, disk, GPU, and process data when `/status` is requested. Per-user `/home` usage is the exception: it is refreshed by `user_disk_cache_updater.sh` at low priority and read from cache during `/status`, so browser refreshes do not spawn expensive `du` scans.
 
 Security properties:
 
@@ -31,5 +31,7 @@ Security properties:
 Operational check from the jump host:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Headers @{ 'X-Agent-Token' = 'suzuki-lab' } http://192.168.2.143:18180/status
+Invoke-WebRequest -UseBasicParsing -Headers @{ 'X-Agent-Token' = '<your-token>' } http://192.168.2.143:18180/status
 ```
+
+

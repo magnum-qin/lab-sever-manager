@@ -24,6 +24,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", statusHandler(probe, token))
 	mux.HandleFunc("/status", statusHandler(probe, token))
+	mux.HandleFunc("/control", controlHandler(token))
 
 	addr := bind + ":" + port
 	server := &http.Server{
@@ -68,5 +69,39 @@ func statusHandler(probe, token string) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(body)
+	}
+}
+
+func controlHandler(token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if token != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Agent-Token")), []byte(token)) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		action := r.URL.Query().Get("action")
+		if action == "start" {
+			script := `if [ -f /home/g24tka12/bin/ollama ]; then
+  OLLAMA_HOST=0.0.0.0 OLLAMA_PORT=11433 nohup /home/g24tka12/bin/ollama serve > /tmp/ollama.log 2>&1 &
+else
+  OLLAMA_HOST=0.0.0.0 OLLAMA_PORT=11433 nohup ollama serve > /tmp/ollama.log 2>&1 &
+fi`
+			cmd := exec.Command("bash", "-c", script)
+			err := cmd.Run()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			_, _ = w.Write([]byte("ollama started\n"))
+		} else if action == "stop" {
+			cmd := exec.Command("pkill", "-f", "ollama serve")
+			_ = cmd.Run()
+			_, _ = w.Write([]byte("ollama stopped\n"))
+		} else {
+			http.Error(w, "invalid action", http.StatusBadRequest)
+		}
 	}
 }

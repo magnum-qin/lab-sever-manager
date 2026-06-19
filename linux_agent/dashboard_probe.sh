@@ -51,3 +51,12 @@ awk -v total="$total_delta" -v idle="$idle_delta" 'BEGIN{if(total>0){printf "%.1
 
 echo __TOP__
 ps -eo pid,user,pcpu,pmem,rss,comm,args --sort=-pcpu | awk 'NR>1 && $0 !~ /du -sm \/home/ && NR<=24 {print}' | head -16
+
+echo __USER_TMP_DISK__
+USER_TMP_CACHE="${TMPDIR:-/tmp}/gpu_status_user_tmp_disk.cache"
+if [ -f "$USER_TMP_CACHE" ]; then
+  cat "$USER_TMP_CACHE" 2>/dev/null || true
+fi
+
+echo __LOGINS__
+last -n 12 2>/dev/null | grep -v 'wtmp begins' | grep -v '^$' || true

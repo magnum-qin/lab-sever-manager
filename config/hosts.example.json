@@ -1,11 +1,11 @@
-﻿{
+{
     "dashboard":  {
                       "bind_host":  "0.0.0.0",
                       "bind_port":  18080,
                       "poll_seconds":  2,
                       "agent_port":  18180,
                       "ssh_user":  "g24tka12",
-                      "agent_token":  "suzuki-lab",
+                      "agent_token":  "set-real-token-here",
                       "access_mode":  "direct"
                   },
     "hosts":  [
@@ -51,3 +51,4 @@
                   }
               ]
 }
+
