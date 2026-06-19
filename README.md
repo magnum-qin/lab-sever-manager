@@ -214,6 +214,17 @@ Verify connectivity from your local client:
 curl.exe http://100.99.99.99:11441/api/tags
 ```
 
+### vLLM Port Forwarding Map
+
+Additional vLLM model servers are exposed on separate ports via the same jump host:
+
+* `100.99.99.99:11455` &rarr; `a6000-155` (`192.168.2.155:11444`) — **DiffusionGemma 26B-A4B FP8** (vLLM, OpenAI-compatible API)
+
+Verify connectivity:
+```powershell
+curl.exe http://100.99.99.99:11455/v1/models
+```
+
 ### RDP Access
 * **Jump Host**: `mstsc /v:100.99.99.99` (log in as `James`).
 * The internal Linux hosts are Linux/Ubuntu systems; do not use RDP for them unless a desktop service is manually configured.
