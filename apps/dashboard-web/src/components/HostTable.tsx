@@ -123,14 +123,14 @@ export function HostDetailsView({ host, cpuHistory, gpuHistory, pollSeconds = 2 
             <Users size={12} className="text-slate-400" />
             <span>{uniqueUsers(host) || 0} Logged In</span>
           </div>
-          {host.state !== 'down' && (
-            <button
-              onClick={() => setIsUnslothModalOpen(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-650 bg-indigo-50/40 border border-indigo-100 hover:bg-indigo-100/60 hover:shadow-sm rounded-full px-4 py-1.5 shadow-sm transition-all duration-200 cursor-pointer"
+          {host.alerts && host.alerts.length > 0 && (
+            <div 
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-full px-4 py-1.5 shadow-sm cursor-help transition-colors hover:bg-rose-100"
+              title={host.alerts.map((a: any) => a.message).join('\n')}
             >
-              <Brain size={13} className="text-indigo-500" />
-              <span>Manage Ollama</span>
-            </button>
+              <AlertTriangle size={14} className="text-rose-500 animate-pulse" />
+              <span>{host.alerts.length} Active Warning{host.alerts.length > 1 ? 's' : ''}</span>
+            </div>
           )}
         </div>
       </div>
