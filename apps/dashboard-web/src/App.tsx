@@ -373,6 +373,7 @@ function App() {
                   cpuHistory={activeHostData.history?.cpu ?? []}
                   gpuHistory={activeHostData.history?.gpu ?? []}
                   pollSeconds={status?.poll_seconds ?? 2}
+                  onSelectAlertsTab={() => setActiveTab('attention')}
                 />
               </div>
             )}

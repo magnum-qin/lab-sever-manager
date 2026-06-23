@@ -86,10 +86,11 @@ type HostDetailsViewProps = {
   cpuHistory: number[];
   gpuHistory: number[];
   pollSeconds?: number;
+  onSelectAlertsTab?: () => void;
 };
 
 // 2. Comprehensive Spacious Selected Server Details View
-export function HostDetailsView({ host, cpuHistory, gpuHistory, pollSeconds = 2 }: HostDetailsViewProps) {
+export function HostDetailsView({ host, cpuHistory, gpuHistory, pollSeconds = 2, onSelectAlertsTab }: HostDetailsViewProps) {
   const [isUnslothModalOpen, setIsUnslothModalOpen] = useState(false);
   const groups = groupProcesses(host);
   const isDown = host.state === 'down';
@@ -125,7 +126,8 @@ export function HostDetailsView({ host, cpuHistory, gpuHistory, pollSeconds = 2 
           </div>
           {host.alerts && host.alerts.length > 0 && (
             <div 
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-full px-4 py-1.5 shadow-sm cursor-help transition-colors hover:bg-rose-100"
+              onClick={onSelectAlertsTab}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-full px-4 py-1.5 shadow-sm cursor-default transition-colors hover:bg-rose-100"
               title={host.alerts.map((a: any) => a.message).join('\n')}
             >
               <AlertTriangle size={14} className="text-rose-500 animate-pulse" />
