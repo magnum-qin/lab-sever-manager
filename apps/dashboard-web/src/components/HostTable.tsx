@@ -1,4 +1,4 @@
-import { AlertTriangle, HardDrive, MemoryStick, Users, Activity, Server, Layers, Brain, X } from 'lucide-react';
+import { Server, Activity, HardDrive, Cpu, MemoryStick as Memory, ExternalLink, RefreshCw, AlertTriangle, Play, Square, Globe, Layers, X, Brain, Download, Trash2, Shield, Search, Plus, Users, Clock, Database } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { HostStatus } from '../types';
@@ -90,12 +90,12 @@ type HostDetailsViewProps = {
 
 // 2. Comprehensive Spacious Selected Server Details View
 export function HostDetailsView({ host, cpuHistory, gpuHistory, pollSeconds = 2 }: HostDetailsViewProps) {
-  const [isOllamaModalOpen, setIsOllamaModalOpen] = useState(false);
+  const [isUnslothModalOpen, setIsUnslothModalOpen] = useState(false);
   const groups = groupProcesses(host);
   const isDown = host.state === 'down';
 
   useEffect(() => {
-    setIsOllamaModalOpen(false);
+    setIsUnslothModalOpen(false);
   }, [host.name]);
 
   return (
@@ -125,7 +125,7 @@ export function HostDetailsView({ host, cpuHistory, gpuHistory, pollSeconds = 2 
           </div>
           {host.state !== 'down' && (
             <button
-              onClick={() => setIsOllamaModalOpen(true)}
+              onClick={() => setIsUnslothModalOpen(true)}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-650 bg-indigo-50/40 border border-indigo-100 hover:bg-indigo-100/60 hover:shadow-sm rounded-full px-4 py-1.5 shadow-sm transition-all duration-200 cursor-pointer"
             >
               <Brain size={13} className="text-indigo-500" />
@@ -336,325 +336,436 @@ export function HostDetailsView({ host, cpuHistory, gpuHistory, pollSeconds = 2 
           </div>
         </Card>
 
-        {/* Active Warnings Card */}
-        <Card className="flex flex-col h-[350px] bg-white border-slate-200">
-          <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm mb-3">
-            <AlertTriangle size={15} className="text-amber-500" />
-            <span>Active Warnings</span>
-          </div>
-          <div className="space-y-2 overflow-y-auto flex-1 min-h-0 pr-1">
-            {(host.alerts ?? []).length ? (
-              (host.alerts ?? []).map((alert, i) => (
-                <div
-                  className={`flex gap-2 rounded-lg border-l-2 p-2.5 text-xs leading-relaxed ${
-                    alert.level === 'critical'
-                      ? 'border-rose-500 bg-rose-50 text-rose-700'
-                      : 'border-amber-500 bg-amber-50 text-amber-700'
-                  }`}
-                  key={i}
-                >
-                  <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-                  <span>{alert.message}</span>
-                </div>
-              ))
-            ) : (
-              <span className="text-xs text-slate-400 italic block">No active warnings. All systems normal.</span>
-            )}
-          </div>
-        </Card>
+        {/* Unsloth Studio Inline Card */}
+        <UnslothManagerCard host={host} />
       </div>
 
-      {/* User Processes Section */}
-      <UserProcessesSection host={host} groups={groups} />
+      {/* User Processes Card Panels Grid */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
+          Active Processes by User
+        </h4>
+        {groups.length ? (
+          <motion.div layout className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <AnimatePresence mode="popLayout">
+              {groups.map(({ user, processes, disk, cpu, mem, gpuMem }) => {
+                const [containerClass, dotClass] = colorFor(user);
+                const totalGpuMem = host.gpus && host.gpus.length > 0 
+                  ? host.gpus.reduce((sum, g) => sum + g.mem_total_mb, 0)
+                  : (host.gpu ? host.gpu.mem_total_mb : 0);
+                const gpuMemPct = totalGpuMem > 0 ? (gpuMem / totalGpuMem) * 100 : 0;
+                const getResourceColor = (val: number) => {
+                  if (val >= 80) return 'text-rose-500 font-bold';
+                  if (val >= 50) return 'text-amber-500 font-bold';
+                  return 'text-slate-500';
+                };
+                
+                const isGpuIdle = host.gpus && host.gpus.length > 0 
+                  ? host.gpus.every(g => g.util_gpu === 0) 
+                  : (host.gpu ? host.gpu.util_gpu === 0 : false);
+                
+                return (
+                  <motion.div
+                    key={user}
+                    layout
+                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 15, transition: { duration: 0.15 } }}
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    className={`rounded-xl border shadow-sm p-4.5 flex flex-col ${containerClass}`}
+                  >
+                    {/* User Stats Summary header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-full ${dotClass}`} />
+                        <span className="font-bold text-slate-800 text-sm">{user}</span>
+                        {disk && (
+                          <span className="text-[10px] font-mono text-slate-500 bg-slate-105 border border-slate-200 px-1.5 py-0.5 rounded">
+                            {mb(disk.used_mb)} home
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-500 font-semibold font-mono">
+                        {processes.length} procs
+                        {" • "}
+                        <span className={getResourceColor(cpu)}>CPU {cpu.toFixed(1)}%</span>
+                        {" • "}
+                        <span className={getResourceColor(mem)}>MEM {mem.toFixed(1)}%</span>
+                        {" • "}
+                        <span className={getResourceColor(gpuMemPct)}>
+                          GPU {gpuMemPct.toFixed(1)}% ({gpuMem ? mb(gpuMem) : '0M'})
+                        </span>
+                      </span>
+                    </div>
 
-      {/* Ollama Engine Manager Modal Dialog */}
-      <AnimatePresence>
-        {isOllamaModalOpen && (
+                    {/* Processes Subtable */}
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full text-left text-[11px] border-collapse min-w-[420px]">
+                        <thead>
+                          <tr className="text-slate-400 font-bold border-b border-slate-200/50">
+                            <th className="pb-1.5 font-semibold w-[80px]">PID</th>
+                            <th className="pb-1.5 font-semibold w-[60px]">CPU</th>
+                            <th className="pb-1.5 font-semibold w-[60px]">MEM</th>
+                            <th className="pb-1.5 font-semibold w-[90px]">GPU MEM</th>
+                            <th className="pb-1.5 font-semibold">COMMAND</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {processes.slice(0, 15).map((process, i) => (
+                            <tr key={i} className="hover:bg-slate-50/50">
+                              <td className="py-1.5 font-mono text-slate-500">{process.pid}</td>
+                              <td className="py-1.5 text-slate-700">{process.cpu || '0'}%</td>
+                              <td className="py-1.5 text-slate-700">{process.mem || '0'}%</td>
+                              <td className="py-1.5 text-slate-700 font-mono">
+                                {process.gpu_mem_mb ? (
+                                  <div className="flex items-center gap-1">
+                                    <span>{mb(process.gpu_mem_mb)}</span>
+                                    {isGpuIdle && (
+                                      <span
+                                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
+                                        title="VRAM is occupied while GPU computation is idle (0%)"
+                                      >
+                                        VRAM Holder
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : '-'}
+                              </td>
+                              <td
+                                className="py-1.5 font-mono text-slate-500 truncate max-w-[200px]"
+                                title={process.cmd || process.process}
+                              >
+                                {process.cmd || process.process || '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </motion.div>
+        ) : (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
-            onClick={() => setIsOllamaModalOpen(false)}
+            className="flex items-center gap-2 text-slate-400 text-xs py-4 pl-1"
           >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="w-full max-w-4xl max-h-[90vh] overflow-y-auto relative"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <OllamaManagerCard
-                hostName={host.name}
-                hostState={host.state}
-                onClose={() => setIsOllamaModalOpen(false)}
-              />
-            </motion.div>
+            <Server size={14} />
+            <span>No active user processes reported on this server.</span>
           </motion.div>
         )}
-      </AnimatePresence>
+      </div>
+
+      {/* Unsloth Manager Modal Dialog */}
     </div>
   );
 }
 
-function OllamaManagerCard({ hostName, hostState, onClose }: { hostName: string; hostState: string; onClose?: () => void }) {
-  const [running, setRunning] = useState(false);
-  const [models, setModels] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isStartingOrStopping, setIsStartingOrStopping] = useState(false);
-  
-  // Pull states
-  const [modelTag, setModelTag] = useState('');
-  const [pulling, setPulling] = useState(false);
-  const [pullPercent, setPullPercent] = useState(0);
-  const [pullStatus, setPullStatus] = useState<string | null>(null);
 
+interface UnslothStatus {
+  installed: boolean;
+  running: boolean;
+  vram_used_mb: number;
+  timeout_minutes: number;
+}
+
+function UnslothManagerCard({ host }: { host: any }) {
+  const hostName = host.name;
+  const hostState = host.state;
+  const totalVramMb = React.useMemo(() => {
+    if (host.gpus && host.gpus.length > 0) return host.gpus.reduce((sum: number, g: any) => sum + g.mem_total_mb, 0);
+    return host.gpu ? host.gpu.mem_total_mb : 1;
+  }, [host]);
+  
+  const [status, setStatus] = React.useState<UnslothStatus | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [timeoutMin, setTimeoutMin] = React.useState("0");
+  const [saveSuccess, setSaveSuccess] = React.useState(false);
+  const [proxy, setProxy] = React.useState<any>(null);
+  const [showModelsModal, setShowModelsModal] = React.useState(false);
+  
   const loadStatus = async () => {
-    if (hostState === 'down') {
-      setRunning(false);
-      return;
-    }
+    if (hostState === 'down') return;
     setLoading(true);
-    setError(null);
     try {
-      const res = await fetch(`/api/ollama/models?host=${hostName}`);
-      if (!res.ok) {
-        setRunning(false);
-        setModels([]);
-      } else {
+      const res = await fetch(`/api/unsloth/status?host=${hostName}`);
+      if (res.ok) {
         const data = await res.json();
-        setRunning(true);
-        setModels(data.models || []);
+        setStatus(data);
+        setTimeoutMin(data.timeout_minutes.toString());
+      }
+      const proxyRes = await fetch('/api/portproxy');
+      if (proxyRes.ok) {
+        const proxies = await proxyRes.json();
+        const myProxy = proxies.find((p: any) => p.connect_address === host.ip && p.connect_port === 8888);
+        setProxy(myProxy || null);
       }
     } catch (e) {
-      setRunning(false);
-      setModels([]);
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     loadStatus();
   }, [hostName, hostState]);
 
-  const handleControl = async (action: 'start' | 'stop') => {
-    setIsStartingOrStopping(true);
+  const handleAction = async (action: string, extraParams: string = "") => {
     try {
-      const res = await fetch(`/api/ollama/control?host=${hostName}&action=${action}`, {
-        method: 'POST'
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || `${res.status} ${res.statusText}`);
-      }
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const res = await fetch(`/api/unsloth/control?host=${hostName}&action=${action}${extraParams}`, { method: 'POST' });
+      if (!res.ok) throw new Error(await res.text());
       await loadStatus();
+      if (action === 'set_timeout') {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
+      }
     } catch (e) {
-      alert(`Operation failed: ${e instanceof Error ? e.message : e}`);
-    } finally {
-      setIsStartingOrStopping(false);
+      alert(`操作失败: ${e}`);
     }
   };
 
-  const handlePull = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!modelTag.trim()) return;
-    setPulling(true);
-    setPullPercent(0);
-    setPullStatus("Connecting...");
+  const handleProxyToggle = async () => {
     try {
-      const response = await fetch(`/api/ollama/pull?host=${hostName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: modelTag })
-      });
-      if (!response.ok) {
-        const txt = await response.text();
-        throw new Error(txt || "Failed to start pulling");
-      }
-      
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      
-      while (reader) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const data = JSON.parse(line);
-            setPullStatus(data.status || "Downloading...");
-            if (data.total > 0) {
-              setPullPercent(Math.round((data.completed / data.total) * 100));
+      setLoading(true);
+      if (proxy) {
+        await fetch('/api/portproxy/delete', {
+          method: 'POST',
+          body: JSON.stringify({ listen_address: proxy.listen_address, listen_port: proxy.listen_port })
+        });
+      } else {
+        const proxyRes = await fetch('/api/portproxy');
+        let availablePort = 11441;
+        if (proxyRes.ok) {
+          const proxies = await proxyRes.json();
+          const unslothProxies = proxies.filter((p: any) => p.connect_port === 8888);
+          const usedPorts = new Set(unslothProxies.map((p: any) => p.listen_port));
+          for (let p = 11441; p <= 11448; p++) {
+            if (!usedPorts.has(p)) {
+              availablePort = p;
+              break;
             }
-            if (data.status === "success") {
-              setPullStatus("Model installed successfully!");
-              setPullPercent(100);
-            }
-          } catch (e) {
-            // ignore partial json
           }
         }
+        await fetch('/api/portproxy/add', {
+          method: 'POST',
+          body: JSON.stringify({ listen_address: '0.0.0.0', listen_port: availablePort, connect_address: host.ip, connect_port: 8888 })
+        });
       }
-      setModelTag('');
-      loadStatus();
+      await loadStatus();
     } catch (e) {
-      alert(`Pull failed: ${e instanceof Error ? e.message : e}`);
-      setPullStatus(null);
+      alert(`代理操作失败: ${e}`);
     } finally {
-      setPulling(false);
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (name: string) => {
-    if (!window.confirm(`Are you sure you want to delete model ${name}?`)) return;
-    try {
-      const res = await fetch(`/api/ollama/delete?host=${hostName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || `${res.status} ${res.statusText}`);
-      }
-      loadStatus();
-    } catch (e) {
-      alert(`Delete failed: ${e instanceof Error ? e.message : e}`);
-    }
-  };
+  if (loading && !status) {
+    return (
+      <Card className="flex flex-col h-[350px] bg-white border-slate-200">
+         <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm mb-3">
+            <Brain size={15} className="text-indigo-600" />
+            <span>Unsloth Studio</span>
+          </div>
+         <div className="text-center text-slate-400 text-sm mt-10">Loading engine state...</div>
+      </Card>
+    );
+  }
+
+  if (!status) {
+    return (
+      <Card className="flex flex-col h-[350px] bg-white border-slate-200">
+          <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm mb-3">
+            <Brain size={15} className="text-indigo-600" />
+            <span>Unsloth Studio</span>
+          </div>
+          <div className="text-center flex flex-col items-center gap-2 mt-6">
+            <X className="text-rose-400 w-6 h-6" />
+            <p className="text-xs text-slate-500">Node unreachable</p>
+            <button onClick={loadStatus} className="mt-2 text-[10px] px-3 py-1 bg-slate-50 border border-slate-200 text-slate-600 font-bold rounded hover:bg-slate-100 transition-colors">
+              Retry
+            </button>
+          </div>
+      </Card>
+    );
+  }
+
+  if (!status.installed) {
+    return (
+      <Card className="flex flex-col h-[350px] bg-white border-slate-200">
+          <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm mb-3">
+            <Brain size={15} className="text-indigo-600" />
+            <span>Unsloth Studio</span>
+          </div>
+          <div className="text-center flex flex-col items-center justify-center h-full pb-8">
+            <Brain className="text-slate-200 w-10 h-10 mb-3" />
+            <p className="text-[11px] text-slate-400 max-w-[180px]">Environment not installed</p>
+          </div>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="flex flex-col bg-white border-slate-200">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
-            OL
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-800">Ollama Engine</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Manage LLMs running locally on this host.</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {hostState === 'down' ? (
-            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-              Host Down
-            </span>
-          ) : running ? (
-            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+    <Card className="flex flex-col h-[350px] bg-white border-slate-200">
+      <div className="flex justify-between items-center text-slate-800 font-semibold text-sm mb-3 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <Brain size={15} className="text-indigo-600" />
+          <span className="truncate">Unsloth Studio</span>
+          {status.running ? (
+            <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 ml-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               Active
             </span>
           ) : (
-            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-slate-100 text-slate-550 border border-slate-200">
+            <span className="flex items-center gap-1 text-[10px] text-slate-500 font-bold bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 ml-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-slate-400 shrink-0" />
               Stopped
             </span>
           )}
-
-          {hostState !== 'down' && (
-            <button
-              onClick={() => handleControl(running ? 'stop' : 'start')}
-              disabled={isStartingOrStopping || pulling}
-              className={`text-xs px-3 py-1.5 rounded-lg border font-bold cursor-pointer transition ${
-                running
-                  ? 'bg-white border-rose-200 text-rose-600 hover:bg-rose-50'
-                  : 'bg-indigo-650 border-indigo-650 text-white hover:bg-indigo-700'
-              } disabled:opacity-50`}
-            >
-              {isStartingOrStopping ? "Wait..." : running ? "Stop Ollama" : "Start Ollama"}
+        </div>
+        <div className="flex items-center ml-2 shrink-0">
+          {status.running ? (
+            <button onClick={() => handleAction('stop')} className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-100 px-2.5 py-1 rounded transition-colors flex items-center gap-1 shadow-sm">
+              <Square size={9} fill="currentColor" /> Stop
             </button>
-          )}
-
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors cursor-pointer"
-              title="Close modal"
-            >
-              <X size={18} />
+          ) : (
+            <button onClick={() => handleAction('start')} className="text-[10px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 px-2.5 py-1 rounded transition-colors flex items-center gap-1 shadow-sm">
+              <Play size={9} fill="currentColor" /> Start
             </button>
           )}
         </div>
       </div>
 
-      {running && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-3 border-t border-slate-100">
-          <div className="lg:col-span-2 flex flex-col">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Installed Models ({models.length})</span>
-            <div className="flex-1 overflow-y-auto max-h-[200px] pr-3 space-y-1 divide-y divide-slate-100 min-h-[120px]">
-              {models.length > 0 ? (
-                models.map((m: any, idx: number) => {
-                  const sizeGB = (m.size / 1024 / 1024 / 1024).toFixed(2);
-                  return (
-                    <div key={idx} className="flex justify-between items-center py-2 text-xs font-mono">
-                      <div className="min-w-0 flex-1 pr-3">
-                        <span className="text-slate-800 font-bold truncate block">{m.name}</span>
-                        <span className="text-[10px] text-slate-400 block mt-0.5 font-sans">Family: {m.details?.family || 'unknown'} • Size: {sizeGB} GB</span>
-                      </div>
-                      <button
-                        onClick={() => handleDelete(m.name)}
-                        className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 hover:border-rose-300 rounded-lg px-2.5 py-1.5 transition-colors cursor-pointer shrink-0 font-sans"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  );
-                })
-              ) : (
-                <span className="text-xs text-slate-400 italic block py-2">No models installed. Use the form to pull models.</span>
-              )}
+      <div className="space-y-0 overflow-y-auto flex-1 min-h-0 pr-1 pb-1">
+        
+        
+
+        {/* Memory Allocation */}
+        <div className="flex flex-col border-b border-slate-100 py-3 first:pt-0">
+          <div className="flex justify-between items-center gap-2 font-semibold text-slate-700 text-sm mb-2">
+            <span className="text-xs text-slate-600 flex items-center gap-1.5 min-w-0">
+              <Database size={13} className="text-slate-400" />
+              Memory Allocation
+            </span>
+            {status.running && status.vram_used_mb > 2000 && (
+              <button onClick={() => handleAction('unload')} className="text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-0.5 rounded transition-colors shadow-sm">
+                Unload Model
+              </button>
+            )}
+          </div>
+          
+          <div className="mb-1 p-3 bg-slate-50 border border-slate-100 rounded-xl">
+            <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-indigo-600 font-bold">VRAM</span>
+                <span className="text-slate-400 font-normal">Usage</span>
+              </div>
+              <span className="font-mono font-bold text-slate-800">
+                {status.running && status.vram_used_mb > 2000 
+                  ? `${Math.round((status.vram_used_mb / Math.max(1, totalVramMb)) * 100)}% ` 
+                  : '0% '}
+                <span className="text-slate-400 font-normal">
+                  ({status.running && status.vram_used_mb > 2000 ? Math.round(status.vram_used_mb/1024) : 0} GB / {Math.round(totalVramMb/1024)} GB)
+                </span>
+              </span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-500 ${
+                  (status.vram_used_mb / Math.max(1, totalVramMb)) >= 0.9 ? 'bg-rose-500' : (status.vram_used_mb / Math.max(1, totalVramMb)) >= 0.75 ? 'bg-amber-500' : 'bg-indigo-600'
+                }`}
+                style={{ width: `${status.running && status.vram_used_mb > 0 ? Math.min(100, (status.vram_used_mb / Math.max(1, totalVramMb)) * 100) : 0}%` }}
+              />
             </div>
           </div>
+        </div>
 
-          <div className="lg:col-span-1 border-t lg:border-t-0 lg:border-l lg:border-slate-100 pt-4 lg:pt-0 lg:pl-4 flex flex-col">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Download LLM Model</span>
-            <form onSubmit={handlePull} className="space-y-3 flex-1 flex flex-col justify-between">
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="e.g. qwen2.5:7b or llama3"
-                  value={modelTag}
-                  onChange={(e) => setModelTag(e.target.value)}
-                  disabled={pulling}
-                  className="w-full text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                />
-                
-                {pulling && pullStatus && (
-                  <div className="p-2 bg-slate-50 border border-slate-100 rounded-lg space-y-1">
-                    <div className="flex justify-between text-[9px] font-bold font-mono text-slate-500">
-                      <span className="truncate pr-1">{pullStatus}</span>
-                      <span>{pullPercent}%</span>
-                    </div>
-                    {pullPercent > 0 && (
-                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                        <div
-                          className="bg-indigo-650 h-full rounded-full transition-all duration-300"
-                          style={{ width: `${Math.min(100, pullPercent)}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={pulling || !modelTag.trim()}
-                className="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-900 transition disabled:opacity-50 cursor-pointer mt-3"
-              >
-                {pulling ? "Pulling..." : "Pull Model"}
-              </button>
-            </form>
+        {/* Network Access */}
+        <div className="flex flex-col border-b border-slate-100 py-3">
+          <div className="flex justify-between items-center gap-2 font-semibold text-slate-700 text-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs text-slate-600 flex items-center gap-1.5 whitespace-nowrap">
+                <Globe size={13} className="text-slate-400" />
+                Public Proxy
+              </span>
+              {proxy ? (
+                <a 
+                  href={`http://100.99.99.99:${proxy.listen_port}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-indigo-600 text-[11px] truncate bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-100 hover:border-indigo-300 transition-colors cursor-pointer hover:underline"
+                >
+                  100.99.99.99:{proxy.listen_port}
+                </a>
+              ) : (
+                <span className="text-[10px] text-slate-400">Disabled</span>
+              )}
+            </div>
+            
+            <button 
+              onClick={handleProxyToggle} 
+              disabled={!status.installed}
+              className={`text-[10px] font-bold px-2 py-0.5 rounded transition-colors shadow-sm border ${
+                proxy 
+                  ? 'text-rose-600 bg-rose-50 hover:bg-rose-100 border-rose-200' 
+                  : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-indigo-200 disabled:opacity-50'
+              }`}
+            >
+              {proxy ? 'Disable' : 'Enable'}
+            </button>
           </div>
         </div>
-      )}
+
+        
+
+        {/* Auto-Unload Configuration */}
+        <div className="flex flex-col border-b border-slate-100 py-3">
+          <div className="flex justify-between items-center gap-2 font-semibold text-slate-700 text-sm">
+            <span className="text-xs text-slate-600 flex items-center gap-1.5 min-w-0">
+              <Clock size={13} className="text-slate-400" />
+              Auto-Unload (mins)
+            </span>
+            <div className="flex items-center gap-1.5">
+              <input 
+                type="number" 
+                value={timeoutMin} 
+                onChange={e => setTimeoutMin(e.target.value)}
+                className="w-10 px-1.5 py-0.5 text-[10px] font-mono bg-white border border-slate-200 rounded outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 text-center shadow-inner"
+                min="0"
+              />
+              <button 
+                onClick={() => handleAction('set_timeout', `&minutes=${timeoutMin}`)} 
+                className={`text-[10px] font-bold px-2 py-0.5 rounded transition-colors shadow-sm border ${
+                  saveSuccess 
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
+                }`}
+              >
+                {saveSuccess ? 'Saved' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Downloaded Models */}
+        <div className="flex flex-col py-3">
+          <button 
+            onClick={() => setShowModelsModal(true)}
+            disabled={!status.installed}
+            className="flex justify-center items-center gap-2 font-semibold text-slate-600 text-xs w-full py-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-sm disabled:opacity-50"
+          >
+            <Layers size={13} className="text-slate-400" />
+            View Downloaded Models
+          </button>
+        </div>
+
+      </div>
+      <ModelsModal host={host} isOpen={showModelsModal} onClose={() => setShowModelsModal(false)} />
     </Card>
   );
 }
@@ -768,6 +879,7 @@ function ModelsModal({ host, isOpen, onClose }: { host: any, isOpen: boolean, on
     </AnimatePresence>
   );
 }
+
 
 function UserProcessesSection({ host, groups }: { host: any, groups: any[] }) {
   const [selectedUser, setSelectedUser] = React.useState<string | null>(null);
