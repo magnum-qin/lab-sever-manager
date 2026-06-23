@@ -1375,3 +1375,102 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
     </div>
   );
 }
+
+// 3. Redesigned split-pane workspace for Attention Needed view
+export function AttentionNeededWorkspace({ hosts, selectedHost, onSelectHost, pollSeconds = 2 }: {
+  hosts: HostStatus[];
+  selectedHost: string | null;
+  onSelectHost: (name: string) => void;
+  pollSeconds?: number;
+}) {
+  const activeHost = hosts.find(h => h.name === selectedHost) || hosts[0] || null;
+
+  if (hosts.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-6 border border-emerald-100 rounded-2xl bg-white shadow-sm max-w-2xl mx-auto my-8">
+        <div className="h-16 w-16 rounded-full bg-emerald-50 border-4 border-emerald-100 flex items-center justify-center text-emerald-500 mb-5 animate-bounce">
+          <Check size={32} className="stroke-[3]" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800">All Nodes Operational</h3>
+        <p className="text-sm text-slate-400 text-center mt-2 max-w-md">
+          Great job! There are currently no active warnings, errors, or offline cluster agents reported. All systems are running healthy.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      {/* Left Column: Servers List (1/3 width) */}
+      <div className="lg:col-span-1 space-y-3">
+        <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
+            Attention Needed List
+          </h3>
+          <span className="text-xs text-slate-405 font-semibold">{hosts.length} items</span>
+        </div>
+        
+        <div className="flex flex-col gap-3 max-h-[75vh] overflow-y-auto pr-1">
+          {hosts.map((host) => {
+            const active = host.name === selectedHost;
+            const isDown = host.state === 'down' || !host.agent_reachable;
+            const cPct = cpuPct(host);
+            const gPct = host.gpu ? host.gpu.util_gpu : 0;
+            const uCount = uniqueUsers(host) || 0;
+
+            return (
+              <div
+                key={host.name}
+                onClick={() => onSelectHost(host.name)}
+                className={`rounded-xl border p-4 cursor-pointer shadow-sm flex flex-col justify-between h-[102px] transition-all duration-200 select-none ${
+                  active
+                    ? 'border-indigo-650 ring-2 ring-indigo-500/20 bg-indigo-50/15 shadow-sm'
+                    : 'border-slate-200 bg-white hover:border-slate-350 hover:shadow-md'
+                }`}
+              >
+                {/* Header info */}
+                <div className="flex justify-between items-start gap-2">
+                  <div className="min-w-0">
+                    <span className="font-bold text-slate-800 text-sm block leading-tight truncate">{host.name}</span>
+                    <span className="text-[10px] text-slate-400 font-semibold block mt-0.5 truncate">
+                      {host.group} • {host.ip}
+                    </span>
+                  </div>
+                  <span className={`h-2 w-2 rounded-full shrink-0 mt-1 ${
+                    host.state === 'idle' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]' : host.state === 'busy' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.3)]'
+                  }`} />
+                </div>
+
+                {/* Bottom brief stats */}
+                <div className="flex justify-between items-center text-[10px] font-bold text-slate-505 font-mono pt-1.5 border-t border-slate-100 mt-1">
+                  {isDown ? (
+                    <span className="text-rose-500 font-semibold uppercase tracking-wider truncate">
+                      {host.error || 'unreachable'}
+                    </span>
+                  ) : (
+                    <>
+                      <span>CPU: <strong className="text-slate-800">{cPct}%</strong></span>
+                      <span>GPU: <strong className="text-slate-800">{gPct}%</strong></span>
+                      <span>Users: <strong className="text-slate-800">{uCount}</strong></span>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Right Column: Warnings details (2/3 width) */}
+      <div className="lg:col-span-2 space-y-4">
+        {activeHost ? (
+          <HostWarningDetailsView host={activeHost} pollSeconds={pollSeconds} />
+        ) : (
+          <div className="bg-white border border-slate-200 rounded-xl p-10 text-center shadow-sm text-slate-400 italic text-sm">
+            Select a server from the action list to analyze its warnings.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

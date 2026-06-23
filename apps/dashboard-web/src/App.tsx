@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Gauge, RefreshCw, Server, Search, Play, Pause, Network } from 'lucide-react';
-import { HostCardsGrid, HostDetailsView, HostWarningDetailsView } from './components/HostTable';
+import { HostCardsGrid, HostDetailsView, HostWarningDetailsView, AttentionNeededWorkspace } from './components/HostTable';
 import { Card } from './components/Primitives';
 import { cpuPct, rowSignature } from './metrics';
 import type { StatusResponse } from './types';
@@ -334,13 +334,20 @@ function App() {
             </h3>
             <PortMappingsView hosts={status?.hosts.map(h => ({ name: h.name, ip: h.ip })) ?? []} />
           </div>
+        ) : activeTab === 'attention' ? (
+          <AttentionNeededWorkspace
+            hosts={filteredHosts}
+            selectedHost={selectedHost}
+            onSelectHost={setSelectedHost}
+            pollSeconds={status?.poll_seconds ?? 2}
+          />
         ) : (
           <>
             {/* 1. Server Cards Grid Section */}
             <div className="space-y-3">
               <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  {activeTab === 'attention' ? 'Attention Needed List' : activeTab === 'a6000' ? 'A6000 Nodes' : activeTab === 'rtx4090' ? 'RTX 4090 Nodes' : 'All Cluster Servers'}
+                  {activeTab === 'a6000' ? 'A6000 Nodes' : activeTab === 'rtx4090' ? 'RTX 4090 Nodes' : 'All Cluster Servers'}
                 </h3>
                 <span className="text-xs text-slate-400 font-semibold">{filteredHosts.length} items</span>
               </div>
@@ -366,22 +373,15 @@ function App() {
             {status && activeHostData && (
               <div className="space-y-4">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
-                  {activeTab === 'attention' ? `Attention Needed Diagnostics: ${activeHostData.name}` : `Active Server Analytics: ${activeHostData.name}`}
+                  Active Server Analytics: {activeHostData.name}
                 </h3>
-                {activeTab === 'attention' ? (
-                  <HostWarningDetailsView
-                    host={activeHostData}
-                    pollSeconds={status?.poll_seconds ?? 2}
-                  />
-                ) : (
-                  <HostDetailsView
-                    host={activeHostData}
-                    cpuHistory={activeHostData.history?.cpu ?? []}
-                    gpuHistory={activeHostData.history?.gpu ?? []}
-                    pollSeconds={status?.poll_seconds ?? 2}
-                    onSelectAlertsTab={() => setActiveTab('attention')}
-                  />
-                )}
+                <HostDetailsView
+                  host={activeHostData}
+                  cpuHistory={activeHostData.history?.cpu ?? []}
+                  gpuHistory={activeHostData.history?.gpu ?? []}
+                  pollSeconds={status?.poll_seconds ?? 2}
+                  onSelectAlertsTab={() => setActiveTab('attention')}
+                />
               </div>
             )}
           </>
