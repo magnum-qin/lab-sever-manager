@@ -364,126 +364,8 @@ export function HostDetailsView({ host, cpuHistory, gpuHistory, pollSeconds = 2 
         </Card>
       </div>
 
-      {/* User Processes Card Panels Grid */}
-      <div className="space-y-3">
-        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
-          Active Processes by User
-        </h4>
-        {groups.length ? (
-          <motion.div layout className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <AnimatePresence mode="popLayout">
-              {groups.map(({ user, processes, disk, cpu, mem, gpuMem }) => {
-                const [containerClass, dotClass] = colorFor(user);
-                const totalGpuMem = host.gpus && host.gpus.length > 0 
-                  ? host.gpus.reduce((sum, g) => sum + g.mem_total_mb, 0)
-                  : (host.gpu ? host.gpu.mem_total_mb : 0);
-                const gpuMemPct = totalGpuMem > 0 ? (gpuMem / totalGpuMem) * 100 : 0;
-                const getResourceColor = (val: number) => {
-                  if (val >= 80) return 'text-rose-500 font-bold';
-                  if (val >= 50) return 'text-amber-500 font-bold';
-                  return 'text-slate-500';
-                };
-                
-                const isGpuIdle = host.gpus && host.gpus.length > 0 
-                  ? host.gpus.every(g => g.util_gpu === 0) 
-                  : (host.gpu ? host.gpu.util_gpu === 0 : false);
-                
-                return (
-                  <motion.div
-                    key={user}
-                    layout
-                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 15, transition: { duration: 0.15 } }}
-                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                    className={`rounded-xl border shadow-sm p-4.5 flex flex-col ${containerClass}`}
-                  >
-                    {/* User Stats Summary header */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className={`h-2 w-2 rounded-full ${dotClass}`} />
-                        <span className="font-bold text-slate-800 text-sm">{user}</span>
-                        {disk && (
-                          <span className="text-[10px] font-mono text-slate-500 bg-slate-105 border border-slate-200 px-1.5 py-0.5 rounded">
-                            {mb(disk.used_mb)} home
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs text-slate-500 font-semibold font-mono">
-                        {processes.length} procs
-                        {" • "}
-                        <span className={getResourceColor(cpu)}>CPU {cpu.toFixed(1)}%</span>
-                        {" • "}
-                        <span className={getResourceColor(mem)}>MEM {mem.toFixed(1)}%</span>
-                        {" • "}
-                        <span className={getResourceColor(gpuMemPct)}>
-                          GPU {gpuMemPct.toFixed(1)}% ({gpuMem ? mb(gpuMem) : '0M'})
-                        </span>
-                      </span>
-                    </div>
-
-                    {/* Processes Subtable */}
-                    <div className="overflow-x-auto w-full">
-                      <table className="w-full text-left text-[11px] border-collapse min-w-[420px]">
-                        <thead>
-                          <tr className="text-slate-400 font-bold border-b border-slate-200/50">
-                            <th className="pb-1.5 font-semibold w-[80px]">PID</th>
-                            <th className="pb-1.5 font-semibold w-[60px]">CPU</th>
-                            <th className="pb-1.5 font-semibold w-[60px]">MEM</th>
-                            <th className="pb-1.5 font-semibold w-[90px]">GPU MEM</th>
-                            <th className="pb-1.5 font-semibold">COMMAND</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {processes.slice(0, 15).map((process, i) => (
-                            <tr key={i} className="hover:bg-slate-50/50">
-                              <td className="py-1.5 font-mono text-slate-500">{process.pid}</td>
-                              <td className="py-1.5 text-slate-700">{process.cpu || '0'}%</td>
-                              <td className="py-1.5 text-slate-700">{process.mem || '0'}%</td>
-                              <td className="py-1.5 text-slate-700 font-mono">
-                                {process.gpu_mem_mb ? (
-                                  <div className="flex items-center gap-1">
-                                    <span>{mb(process.gpu_mem_mb)}</span>
-                                    {isGpuIdle && (
-                                      <span
-                                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
-                                        title="VRAM is occupied while GPU computation is idle (0%)"
-                                      >
-                                        VRAM Holder
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : '-'}
-                              </td>
-                              <td
-                                className="py-1.5 font-mono text-slate-500 truncate max-w-[200px]"
-                                title={process.cmd || process.process}
-                              >
-                                {process.cmd || process.process || '-'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="flex items-center gap-2 text-slate-400 text-xs py-4 pl-1"
-          >
-            <Server size={14} />
-            <span>No active user processes reported on this server.</span>
-          </motion.div>
-        )}
-      </div>
+      {/* User Processes Section */}
+      <UserProcessesSection host={host} groups={groups} />
 
       {/* Ollama Engine Manager Modal Dialog */}
       <AnimatePresence>
@@ -774,5 +656,283 @@ function OllamaManagerCard({ hostName, hostState, onClose }: { hostName: string;
         </div>
       )}
     </Card>
+  );
+}
+
+
+function ModelsModal({ host, isOpen, onClose }: { host: any, isOpen: boolean, onClose: () => void }) {
+  const [models, setModels] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setLoading(true);
+      setError('');
+      fetch(`/api/unsloth/models?host=${host.name}`)
+        .then(async res => {
+          if (!res.ok) throw new Error(await res.text());
+          return res.json();
+        })
+        .then(data => {
+          setModels(data.data || data.models || data || []);
+        })
+        .catch(err => setError(err.toString()))
+        .finally(() => setLoading(false));
+    }
+  }, [isOpen, host.name]);
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0, y: 10 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 10 }}
+            className="w-full max-w-xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center p-4 bg-slate-50 border-b border-slate-100 shrink-0">
+              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <Layers size={16} className="text-indigo-600" />
+                Models on {host.name}
+              </h2>
+              <button onClick={onClose} className="p-1.5 bg-slate-100 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-5">
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                  <div className="w-6 h-6 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-3"></div>
+                  <span className="text-xs">Fetching downloaded models...</span>
+                </div>
+              ) : error ? (
+                <div className="text-center py-10">
+                  <div className="inline-flex items-center gap-2 text-rose-600 bg-rose-50 px-4 py-2 rounded-lg border border-rose-100 text-xs">
+                    <X size={14} />
+                    {error}
+                  </div>
+                </div>
+              ) : models.length > 0 ? (
+                <div className="space-y-3">
+                  {models.map((m, i) => {
+                    const idParts = (m.id || '').split('/');
+                    const modelName = idParts.pop() || 'Unknown Model';
+                    const orgName = idParts.join('/') || 'Local';
+                    const sizeGb = m.size ? Math.round((m.size/1024/1024/1024)*10)/10 : 0;
+                    
+                    return (
+                      <div key={i} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm hover:border-indigo-200 transition-colors">
+                        <div className="flex flex-col min-w-0 pr-4">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{orgName}</span>
+                          <span className="font-semibold text-slate-700 text-sm truncate mt-0.5" title={m.id}>{modelName}</span>
+                          {sizeGb > 0 && <span className="text-[11px] text-slate-500 mt-1 flex items-center gap-1"><HardDrive size={10} /> {sizeGb} GB</span>}
+                        </div>
+                        <div className="shrink-0">
+                          {m.quantization ? (
+                            <span className="text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded border border-indigo-100">
+                              {m.quantization.toUpperCase()}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-2 py-1 bg-slate-50 text-slate-500 rounded border border-slate-200">
+                              FP16
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 flex flex-col items-center">
+                  <Layers className="text-slate-200 w-12 h-12 mb-3" />
+                  <span className="text-sm text-slate-400">No models found on this node.</span>
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-400 text-center shrink-0">
+              Powered by Unsloth Studio
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function UserProcessesSection({ host, groups }: { host: any, groups: any[] }) {
+  const [selectedUser, setSelectedUser] = React.useState<string | null>(null);
+
+  const highestUser = React.useMemo(() => {
+    if (!groups || groups.length === 0) return null;
+    return groups.reduce((prev, current) => {
+      const prevScore = (prev.gpuMem * 1000) + prev.cpu;
+      const currScore = (current.gpuMem * 1000) + current.cpu;
+      return (currScore > prevScore) ? current : prev;
+    }).user;
+  }, [groups]);
+
+  const activeUser = selectedUser || highestUser;
+  const activeGroup = groups.find(g => g.user === activeUser);
+
+  if (!groups || groups.length === 0) {
+    return (
+      <div className="space-y-3">
+        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
+          Active Processes by User
+        </h4>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+          className="flex items-center gap-2 text-slate-400 text-xs py-4 pl-1"
+        >
+          <Server size={14} />
+          <span>No active user processes reported on this server.</span>
+        </motion.div>
+      </div>
+    );
+  }
+
+  const totalGpuMem = host.gpus && host.gpus.length > 0 
+    ? host.gpus.reduce((sum: number, g: any) => sum + g.mem_total_mb, 0)
+    : (host.gpu ? host.gpu.mem_total_mb : 0);
+  const isGpuIdle = host.gpus && host.gpus.length > 0 
+    ? host.gpus.every((g: any) => g.util_gpu === 0) 
+    : (host.gpu ? host.gpu.util_gpu === 0 : false);
+
+  const getResourceColor = (val: number) => {
+    if (val >= 80) return 'text-rose-500 font-bold';
+    if (val >= 50) return 'text-amber-500 font-bold';
+    return 'text-slate-500';
+  };
+
+  return (
+    <div className="space-y-3">
+      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
+        Active Processes by User
+      </h4>
+      
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Left column: User List */}
+        <div className="w-full lg:w-[35%] flex flex-col gap-2">
+          {groups.map(({ user, processes, disk, cpu, mem, gpuMem }) => {
+            const [containerClass, dotClass] = colorFor(user);
+            const gpuMemPct = totalGpuMem > 0 ? (gpuMem / totalGpuMem) * 100 : 0;
+            const isActive = activeUser === user;
+
+            return (
+              <div
+                key={user}
+                onClick={() => setSelectedUser(user)}
+                className={`cursor-pointer rounded-xl border shadow-sm p-3.5 flex flex-col transition-all duration-200 ${
+                  isActive ? 'border-indigo-400 bg-indigo-50/30 ring-1 ring-indigo-400/50 scale-[1.02]' : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full ${isActive ? 'bg-indigo-500 animate-pulse' : dotClass}`} />
+                    <span className={`font-bold text-sm ${isActive ? 'text-indigo-800' : 'text-slate-800'}`}>{user}</span>
+                  </div>
+                  {disk && (
+                    <span className="text-[9px] font-mono text-slate-500 bg-slate-100 border border-slate-200 px-1 py-0.5 rounded">
+                      {mb(disk.used_mb)} home
+                    </span>
+                  )}
+                </div>
+                
+                <div className="text-[10px] text-slate-500 font-semibold font-mono flex flex-wrap gap-x-2 gap-y-1">
+                  <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">{processes.length} procs</span>
+                  <span className={`bg-slate-100 px-1.5 py-0.5 rounded ${getResourceColor(cpu)}`}>CPU {cpu.toFixed(1)}%</span>
+                  <span className={`bg-slate-100 px-1.5 py-0.5 rounded ${getResourceColor(mem)}`}>MEM {mem.toFixed(1)}%</span>
+                  <span className={`bg-slate-100 px-1.5 py-0.5 rounded ${getResourceColor(gpuMemPct)}`}>
+                    GPU {gpuMemPct.toFixed(1)}% ({gpuMem ? mb(gpuMem) : '0M'})
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        
+        {/* Right column: Active User Process Details */}
+        <div className="w-full lg:w-[65%]">
+          <AnimatePresence mode="wait">
+            {activeGroup && (
+              <motion.div
+                key={activeUser}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+                className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-full min-h-[250px]"
+              >
+                <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                  <span className="font-bold text-slate-700 text-sm">
+                    {activeUser}'s Processes
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
+                    {activeGroup.processes.length} total
+                  </span>
+                </div>
+                
+                <div className="overflow-x-auto w-full flex-1">
+                  <table className="w-full text-left text-[11px] border-collapse min-w-[420px]">
+                    <thead>
+                      <tr className="text-slate-400 font-bold bg-white border-b border-slate-100">
+                        <th className="py-2 pl-4 pr-2 font-semibold w-[80px]">PID</th>
+                        <th className="py-2 px-2 font-semibold w-[60px]">CPU</th>
+                        <th className="py-2 px-2 font-semibold w-[60px]">MEM</th>
+                        <th className="py-2 px-2 font-semibold w-[90px]">GPU MEM</th>
+                        <th className="py-2 pl-2 pr-4 font-semibold">COMMAND</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {activeGroup.processes.slice(0, 20).map((process: any, i: number) => (
+                        <tr key={i} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-2 pl-4 pr-2 font-mono text-slate-500">{process.pid}</td>
+                          <td className="py-2 px-2 text-slate-700">{process.cpu || '0'}%</td>
+                          <td className="py-2 px-2 text-slate-700">{process.mem || '0'}%</td>
+                          <td className="py-2 px-2 text-slate-700 font-mono">
+                            {process.gpu_mem_mb ? (
+                              <div className="flex items-center gap-1">
+                                <span className="text-indigo-600 font-semibold">{mb(process.gpu_mem_mb)}</span>
+                                {isGpuIdle && (
+                                  <span
+                                    className="inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
+                                    title="VRAM is occupied while GPU computation is idle (0%)"
+                                  >
+                                    VRAM Holder
+                                  </span>
+                                )}
+                              </div>
+                            ) : '-'}
+                          </td>
+                          <td
+                            className="py-2 pl-2 pr-4 font-mono text-slate-600 truncate max-w-[200px]"
+                            title={process.cmd || process.process}
+                          >
+                            {process.cmd || process.process || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
   );
 }

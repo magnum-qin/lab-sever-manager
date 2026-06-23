@@ -3,14 +3,31 @@ package main
 import (
 	"context"
 	"crypto/subtle"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
+
+var (
+	idleCounter int
+	idleMu      sync.Mutex
+)
+
+type UnslothStatus struct {
+	Installed      bool   `json:"installed"`
+	Running        bool   `json:"running"`
+	VRAMUsedMB     int    `json:"vram_used_mb"`
+	TimeoutMinutes int    `json:"timeout_minutes"`
+}
 
 func main() {
 	probe := getenv("DASHBOARD_PROBE", "/home/g24tka12/lab-server-manager/dashboard_probe.sh")
@@ -21,10 +38,13 @@ func main() {
 		log.Fatalf("invalid AGENT_PORT %q: %v", port, err)
 	}
 
+	go autoUnloadDaemon()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", statusHandler(probe, token))
 	mux.HandleFunc("/status", statusHandler(probe, token))
-	mux.HandleFunc("/control", controlHandler(token))
+	mux.HandleFunc("/unsloth/status", unslothStatusHandler(token))
+	mux.HandleFunc("/unsloth/control", unslothControlHandler(token))
 
 	addr := bind + ":" + port
 	server := &http.Server{
@@ -32,7 +52,7 @@ func main() {
 		Handler:           mux,
 		ReadHeaderTimeout: 3 * time.Second,
 	}
-	log.Printf("gpu-status-agent listening on http://%s/status, probe=%s, token_required=%t", addr, probe, token != "")
+	log.Printf("gpu-status-agent (unsloth edition) listening on http://%s, token_required=%t", addr, token != "")
 	log.Fatal(server.ListenAndServe())
 }
 
@@ -72,7 +92,75 @@ func statusHandler(probe, token string) http.HandlerFunc {
 	}
 }
 
-func controlHandler(token string) http.HandlerFunc {
+func getTimeoutMinutes() int {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return 0
+	}
+	data, err := ioutil.ReadFile(filepath.Join(home, ".unsloth_auto_unload.json"))
+	if err != nil {
+		return 0
+	}
+	var config map[string]int
+	if err := json.Unmarshal(data, &config); err != nil {
+		return 0
+	}
+	return config["timeout_minutes"]
+}
+
+func setTimeoutMinutes(minutes int) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	config := map[string]int{"timeout_minutes": minutes}
+	data, _ := json.Marshal(config)
+	return ioutil.WriteFile(filepath.Join(home, ".unsloth_auto_unload.json"), data, 0644)
+}
+
+func unslothStatusHandler(token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if token != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Agent-Token")), []byte(token)) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		home, _ := os.UserHomeDir()
+		installed := false
+		if _, err := os.Stat(filepath.Join(home, ".unsloth", "studio", "unsloth_studio", "bin", "unsloth")); err == nil {
+			installed = true
+		}
+
+		running := false
+		cmd := exec.Command("systemctl", "--user", "is-active", "unsloth-studio.service")
+		if err := cmd.Run(); err == nil {
+			running = true
+		}
+
+		vramUsed := 0
+		out, err := exec.Command("nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits").Output()
+		if err == nil {
+			lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+			for _, line := range lines {
+				if v, err := strconv.Atoi(strings.TrimSpace(line)); err == nil {
+					vramUsed += v
+				}
+			}
+		}
+
+		status := UnslothStatus{
+			Installed:      installed,
+			Running:        running,
+			VRAMUsedMB:     vramUsed,
+			TimeoutMinutes: getTimeoutMinutes(),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(status)
+	}
+}
+
+func unslothControlHandler(token string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if token != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Agent-Token")), []byte(token)) != 1 {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -82,26 +170,90 @@ func controlHandler(token string) http.HandlerFunc {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+
 		action := r.URL.Query().Get("action")
-		if action == "start" {
-			script := `if [ -f /home/g24tka12/bin/ollama ]; then
-  OLLAMA_HOST=0.0.0.0 OLLAMA_PORT=11433 nohup /home/g24tka12/bin/ollama serve > /tmp/ollama.log 2>&1 &
-else
-  OLLAMA_HOST=0.0.0.0 OLLAMA_PORT=11433 nohup ollama serve > /tmp/ollama.log 2>&1 &
-fi`
-			cmd := exec.Command("bash", "-c", script)
-			err := cmd.Run()
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			_, _ = w.Write([]byte("ollama started\n"))
-		} else if action == "stop" {
-			cmd := exec.Command("pkill", "-f", "ollama serve")
-			_ = cmd.Run()
-			_, _ = w.Write([]byte("ollama stopped\n"))
-		} else {
+		switch action {
+		case "start":
+			_ = exec.Command("systemctl", "--user", "start", "unsloth-studio.service").Run()
+			w.Write([]byte("started\n"))
+		case "stop":
+			_ = exec.Command("systemctl", "--user", "stop", "unsloth-studio.service").Run()
+			w.Write([]byte("stopped\n"))
+		case "unload":
+			// Unload by restarting the service to forcibly clear VRAM
+			_ = exec.Command("systemctl", "--user", "restart", "unsloth-studio.service").Run()
+			idleMu.Lock()
+			idleCounter = 0
+			idleMu.Unlock()
+			w.Write([]byte("unloaded via restart\n"))
+		case "set_timeout":
+			minutes, _ := strconv.Atoi(r.URL.Query().Get("minutes"))
+			_ = setTimeoutMinutes(minutes)
+			idleMu.Lock()
+			idleCounter = 0
+			idleMu.Unlock()
+			w.Write([]byte("timeout updated\n"))
+		default:
 			http.Error(w, "invalid action", http.StatusBadRequest)
 		}
+	}
+}
+
+func autoUnloadDaemon() {
+	ticker := time.NewTicker(1 * time.Minute)
+	for range ticker.C {
+		timeout := getTimeoutMinutes()
+		if timeout <= 0 {
+			continue
+		}
+
+		// Check if unsloth is running
+		if err := exec.Command("systemctl", "--user", "is-active", "unsloth-studio.service").Run(); err != nil {
+			idleMu.Lock()
+			idleCounter = 0
+			idleMu.Unlock()
+			continue
+		}
+
+		// Get VRAM and Util
+		out, err := exec.Command("nvidia-smi", "--query-gpu=memory.used,utilization.gpu", "--format=csv,noheader,nounits").Output()
+		if err != nil {
+			continue
+		}
+
+		vramUsed := 0
+		maxUtil := 0
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		for _, line := range lines {
+			parts := strings.Split(line, ",")
+			if len(parts) >= 2 {
+				if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil {
+					vramUsed += v
+				}
+				if u, err := strconv.Atoi(strings.TrimSpace(parts[1])); err == nil {
+					if u > maxUtil {
+						maxUtil = u
+					}
+				}
+			}
+		}
+
+		idleMu.Lock()
+		if vramUsed > 2000 { // Model is loaded
+			if maxUtil < 5 { // Idle
+				idleCounter++
+				log.Printf("Unsloth idle for %d minutes (timeout: %d)", idleCounter, timeout)
+				if idleCounter >= timeout {
+					log.Printf("Auto-unloading Unsloth models due to %d minutes of inactivity...", idleCounter)
+					_ = exec.Command("systemctl", "--user", "restart", "unsloth-studio.service").Run()
+					idleCounter = 0
+				}
+			} else { // Active
+				idleCounter = 0
+			}
+		} else { // No model loaded
+			idleCounter = 0
+		}
+		idleMu.Unlock()
 	}
 }

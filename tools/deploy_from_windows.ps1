@@ -20,7 +20,8 @@ foreach ($hostItem in $config.hosts) {
   $target = "$($hostItem.name):$RemoteDir/"
   Write-Host "Deploying Go agent to $($hostItem.name) ($($hostItem.ip))"
   ssh "$($hostItem.name)" "mkdir -p $RemoteDir"
-  # scp "$agent" "$target/gpu-status-agent"
+  scp "$agent" "$target/gpu-status-agent.new"
+  ssh "$($hostItem.name)" "mv -f $RemoteDir/gpu-status-agent.new $RemoteDir/gpu-status-agent"
   scp "$root\linux_agent\dashboard_probe.sh" "$root\linux_agent\install_agent.sh" "$root\linux_agent\user_disk_cache_updater.sh" $target
   if ($agentToken) {
     ssh "$($hostItem.name)" "AGENT_TOKEN='$agentToken' bash $RemoteDir/install_agent.sh"

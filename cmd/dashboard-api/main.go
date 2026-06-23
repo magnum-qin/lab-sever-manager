@@ -192,11 +192,9 @@ func main() {
 	mux.HandleFunc("/api/portproxy", api.handlePortProxy)
 	mux.HandleFunc("/api/portproxy/add", api.handlePortProxyAdd)
 	mux.HandleFunc("/api/portproxy/delete", api.handlePortProxyDelete)
-	mux.HandleFunc("/api/ollama/models", api.handleOllamaProxy)
-	mux.HandleFunc("/api/ollama/ps", api.handleOllamaProxy)
-	mux.HandleFunc("/api/ollama/pull", api.handleOllamaProxy)
-	mux.HandleFunc("/api/ollama/delete", api.handleOllamaProxy)
-	mux.HandleFunc("/api/ollama/control", api.handleOllamaControl)
+	mux.HandleFunc("/api/unsloth/status", api.handleUnslothStatus)
+	mux.HandleFunc("/api/unsloth/control", api.handleUnslothControl)
+	mux.HandleFunc("/api/unsloth/models", api.handleUnslothModels)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok\n")) })
 	mux.HandleFunc("/", api.handleStatic)
 
@@ -919,95 +917,49 @@ func (a *app) handlePortProxyDelete(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok\n"))
 }
 
-func (a *app) handleOllamaProxy(w http.ResponseWriter, r *http.Request) {
+func (a *app) handleUnslothStatus(w http.ResponseWriter, r *http.Request) {
 	hostName := r.URL.Query().Get("host")
-	action := strings.TrimPrefix(r.URL.Path, "/api/ollama/")
-	
-	a.mu.RLock()
-	var hostIP string
-	for _, h := range a.last.Hosts {
-		if h.Name == hostName {
-			hostIP = h.IP
-			break
-		}
-	}
-	a.mu.RUnlock()
-	
-	if hostIP == "" {
-		http.Error(w, "host not found", http.StatusNotFound)
-		return
-	}
-	
-	var path string
-	switch action {
-	case "models":
-		path = "/api/tags"
-	case "ps":
-		path = "/api/ps"
-	case "pull":
-		path = "/api/pull"
-	case "delete":
-		path = "/api/delete"
-	default:
-		http.Error(w, "invalid action", http.StatusBadRequest)
-		return
-	}
-	
-	targetURL := fmt.Sprintf("http://%s:11433%s", hostIP, path)
-	var req *http.Request
-	var err error
-	if r.Method == http.MethodPost {
-		req, err = http.NewRequest(r.Method, targetURL, r.Body)
-	} else {
-		req, err = http.NewRequest(r.Method, targetURL, nil)
-	}
+	hostIP, agentPort, err := a.getHostAddr(hostName)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := a.client.Do(req)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Ollama unreachable: %v", err), http.StatusBadGateway)
-		return
-	}
-	defer resp.Body.Close()
-	
-	for k, vv := range resp.Header {
-		for _, v := range vv {
-			w.Header().Add(k, v)
-		}
-	}
-	w.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(w, resp.Body)
+	token := a.getAgentToken()
+	targetURL := fmt.Sprintf("http://%s:%d/unsloth/status", hostIP, agentPort)
+	a.proxyRequest(w, r, http.MethodGet, targetURL, token)
 }
 
-func (a *app) handleOllamaControl(w http.ResponseWriter, r *http.Request) {
+func (a *app) handleUnslothControl(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	hostName := r.URL.Query().Get("host")
 	action := r.URL.Query().Get("action")
+	minutes := r.URL.Query().Get("minutes")
 	
-	a.mu.RLock()
-	var hostIP string
-	var agentPort int
-	for _, h := range a.last.Hosts {
-		if h.Name == hostName {
-			hostIP = h.IP
-			agentPort = h.Port
-			break
-		}
-	}
-	a.mu.RUnlock()
-	
-	if hostIP == "" {
-		http.Error(w, "host not found", http.StatusNotFound)
+	hostIP, agentPort, err := a.getHostAddr(hostName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	
+	token := a.getAgentToken()
+	targetURL := fmt.Sprintf("http://%s:%d/unsloth/control?action=%s&minutes=%s", hostIP, agentPort, action, minutes)
+	a.proxyRequest(w, r, http.MethodPost, targetURL, token)
+}
+
+func (a *app) getHostAddr(hostName string) (string, int, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	for _, h := range a.last.Hosts {
+		if h.Name == hostName {
+			return h.IP, h.Port, nil
+		}
+	}
+	return "", 0, errors.New("host not found")
+}
+
+func (a *app) getAgentToken() string {
 	cfg, err := loadConfig(a.configPath)
 	token := ""
 	if err == nil {
@@ -1016,9 +968,11 @@ func (a *app) handleOllamaControl(w http.ResponseWriter, r *http.Request) {
 			token = v
 		}
 	}
-	
-	targetURL := fmt.Sprintf("http://%s:%d/control?action=%s", hostIP, agentPort, action)
-	req, err := http.NewRequest(http.MethodPost, targetURL, nil)
+	return token
+}
+
+func (a *app) proxyRequest(w http.ResponseWriter, r *http.Request, method, targetURL, token string) {
+	req, err := http.NewRequest(method, targetURL, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1026,14 +980,39 @@ func (a *app) handleOllamaControl(w http.ResponseWriter, r *http.Request) {
 	if token != "" {
 		req.Header.Set("X-Agent-Token", token)
 	}
-	
 	resp, err := a.client.Do(req)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("agent unreachable: %v", err), http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, resp.Body)
+}
+
+func (a *app) handleUnslothModels(w http.ResponseWriter, r *http.Request) {
+	hostName := r.URL.Query().Get("host")
+	hostIP, _, err := a.getHostAddr(hostName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	targetURL := fmt.Sprintf("http://%s:8888/api/models/local", hostIP)
 	
+	req, err := http.NewRequest(http.MethodGet, targetURL, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer REDACTED_UNSLOTH_API_KEY")
+	
+	resp, err := a.client.Do(req)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unsloth unreachable: %v", err), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
 	_, _ = io.Copy(w, resp.Body)
 }
