@@ -981,7 +981,7 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
         
         <div className="flex items-center gap-2">
           <StatusPill state={host.state} />
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 rounded-full px-3 py-1 shadow-sm select-none">
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-650 bg-white border border-slate-200 rounded-full px-3 py-1 shadow-sm select-none">
             <Users size={11} className="text-slate-400" />
             <span>{uniqueUsers(host) || 0} Logged In</span>
           </div>
@@ -1014,7 +1014,7 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
 
                   {/* Warning Context Details */}
                   {isDiskAlert && (
-                    <div className="space-y-4 pl-6">
+                    <div className="space-y-4 pl-6 w-full">
                       {(() => {
                         const match = alert.message.match(/disk\s+(\S+)\s+/i);
                         const diskPath = match ? match[1] : '/home';
@@ -1023,7 +1023,7 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                         return (
                           <>
                             {targetDisk && (
-                              <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl max-w-xl shadow-inner-sm">
+                              <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl w-full shadow-inner-sm">
                                 <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
                                   <div className="flex items-center gap-1.5">
                                     <span className="font-mono text-indigo-650 font-bold">{targetDisk.target}</span>
@@ -1045,10 +1045,10 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                             )}
 
                             {diskPath === '/home' && (
-                              <div className="flex flex-col min-w-0 min-h-0">
+                              <div className="flex flex-col min-w-0 min-h-0 w-full">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">User Directories (under /home)</span>
-                                <div className="border border-slate-150/60 rounded-xl overflow-hidden bg-slate-50/20 max-w-xl">
-                                  <div className="divide-y divide-slate-100 px-4 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+                                <div className="border border-slate-200/70 rounded-xl overflow-hidden bg-white shadow-sm w-full">
+                                  <div className="divide-y divide-slate-100 px-4 max-h-[260px] overflow-y-auto pr-2 custom-scrollbar">
                                     {(host.user_disk ?? []).length ? (
                                       (host.user_disk ?? [])
                                         .sort((a, b) => b.used_mb - a.used_mb)
@@ -1072,8 +1072,8 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                   )}
 
                   {isCpuAlert && (
-                    <div className="space-y-4 pl-6 max-w-xl">
-                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl shadow-inner-sm">
+                    <div className="space-y-4 pl-6 w-full">
+                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl w-full shadow-inner-sm">
                         <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
                           <span className="text-slate-700 font-bold">CPU Usage</span>
                           <span className="font-mono font-bold text-slate-800">{cPct}%</span>
@@ -1086,9 +1086,9 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                         </div>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-2 w-full">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Top CPU Processes</span>
-                        <div className="border border-slate-150/60 rounded-xl overflow-hidden bg-white shadow-sm">
+                        <div className="border border-slate-200/70 rounded-xl overflow-hidden bg-white shadow-sm w-full">
                           <table className="w-full text-left text-[11px] border-collapse">
                             <thead>
                               <tr className="text-slate-405 font-bold border-b border-slate-100 bg-slate-50/50">
@@ -1110,7 +1110,7 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                                     <td className="py-2 px-2 text-slate-505 font-mono">{p.pid}</td>
                                     <td className="py-2 px-2 text-slate-950 font-bold">{p.cpu}%</td>
                                     <td className="py-2 px-2 text-slate-600">{p.mem}%</td>
-                                    <td className="py-2 pl-2 pr-3.5 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
+                                    <td className="py-2 pl-2 pr-3.5 text-slate-600 font-mono truncate max-w-[300px]" title={p.cmd || p.process}>
                                       {p.cmd || p.process}
                                     </td>
                                   </tr>
@@ -1123,8 +1123,8 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                   )}
 
                   {isMemAlert && (
-                    <div className="space-y-4 pl-6 max-w-xl">
-                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl shadow-inner-sm">
+                    <div className="space-y-4 pl-6 w-full">
+                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl w-full shadow-inner-sm">
                         <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
                           <span className="text-slate-700 font-bold">System Memory Usage</span>
                           <span className="font-mono font-bold text-slate-800">{mPct}% ({mb(host.memory?.used_mb)} / {mb(host.memory?.total_mb)})</span>
@@ -1137,9 +1137,9 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                         </div>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-2 w-full">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Top Memory Processes</span>
-                        <div className="border border-slate-150/60 rounded-xl overflow-hidden bg-white shadow-sm">
+                        <div className="border border-slate-200/70 rounded-xl overflow-hidden bg-white shadow-sm w-full">
                           <table className="w-full text-left text-[11px] border-collapse">
                             <thead>
                               <tr className="text-slate-405 font-bold border-b border-slate-100 bg-slate-50/50">
@@ -1161,7 +1161,7 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                                     <td className="py-2 px-2 text-slate-505 font-mono">{p.pid}</td>
                                     <td className="py-2 px-2 text-slate-650">{p.cpu}%</td>
                                     <td className="py-2 px-2 text-slate-950 font-bold">{p.mem}%</td>
-                                    <td className="py-2 pl-2 pr-3.5 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
+                                    <td className="py-2 pl-2 pr-3.5 text-slate-600 font-mono truncate max-w-[300px]" title={p.cmd || p.process}>
                                       {p.cmd || p.process}
                                     </td>
                                   </tr>
@@ -1174,8 +1174,8 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                   )}
 
                   {isVramAlert && (
-                    <div className="space-y-4 pl-6 max-w-xl">
-                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl shadow-inner-sm">
+                    <div className="space-y-4 pl-6 w-full">
+                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl w-full shadow-inner-sm">
                         <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
                           <span className="text-slate-700 font-bold">GPU VRAM Allocation</span>
                           <span className="font-mono font-bold text-slate-800">{vPct}% ({mb(host.gpu?.mem_used_mb)} / {mb(host.gpu?.mem_total_mb)})</span>
@@ -1188,9 +1188,9 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                         </div>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-2 w-full">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active GPU Processes</span>
-                        <div className="border border-slate-150/60 rounded-xl overflow-hidden bg-white shadow-sm">
+                        <div className="border border-slate-200/70 rounded-xl overflow-hidden bg-white shadow-sm w-full">
                           <table className="w-full text-left text-[11px] border-collapse">
                             <thead>
                               <tr className="text-slate-405 font-bold border-b border-slate-100 bg-slate-50/50">
@@ -1210,7 +1210,7 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                                     <td className="py-2 px-3.5 text-slate-700 font-semibold">{p.user || 'root'}</td>
                                     <td className="py-2 px-2 text-slate-505 font-mono">{p.pid}</td>
                                     <td className="py-2 px-2 text-slate-950 font-bold font-mono">{mb(p.gpu_mem_mb)}</td>
-                                    <td className="py-2 pl-2 pr-3.5 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
+                                    <td className="py-2 pl-2 pr-3.5 text-slate-600 font-mono truncate max-w-[300px]" title={p.cmd || p.process}>
                                       {p.cmd || p.process}
                                     </td>
                                   </tr>
@@ -1223,8 +1223,8 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                   )}
 
                   {isTempAlert && host.gpu && (
-                    <div className="space-y-2 pl-6 max-w-xl">
-                      <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs shadow-inner-sm">
+                    <div className="space-y-2 pl-6 w-full">
+                      <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs shadow-inner-sm w-full">
                         <span className="text-slate-700 font-bold">GPU Temperature</span>
                         <span className="font-mono font-bold text-rose-600">{host.gpu.temp_c}°C</span>
                       </div>
@@ -1235,8 +1235,8 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
                   )}
 
                   {isGpuMetricsAlert && (
-                    <div className="pl-6 max-w-xl">
-                      <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-650 leading-relaxed shadow-inner-sm">
+                    <div className="pl-6 w-full">
+                      <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-650 leading-relaxed shadow-inner-sm w-full">
                         <strong className="text-slate-800">NVIDIA Driver Check:</strong> The NVIDIA driver might have crashed or requires rebuilding. Please log in to the host machine and run <code>nvidia-smi</code> for diagnostics.
                       </div>
                     </div>
