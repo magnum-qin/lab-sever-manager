@@ -961,295 +961,292 @@ export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDet
   const vPct = vramPct(host);
 
   return (
-    <div className="space-y-6">
-      {/* Selected Host Header Summary (Identical to HostDetailsView) */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      {/* Header Panel */}
+      <div className="bg-slate-50/70 px-6 py-4.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 shrink-0">
-            <Server size={20} />
+          <div className="h-9 w-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 shadow-sm shrink-0">
+            <Server size={18} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900">{host.name}</h2>
-              <span className={`h-2 w-2 rounded-full ${isDown ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+              <h2 className="text-md font-bold text-slate-800">{host.name}</h2>
+              <span className={`h-2 w-2 rounded-full ${isDown ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Cluster Group: <strong className="text-slate-600">{host.group}</strong> • Host Address: <strong className="text-slate-600">{host.ip}:{host.port}</strong>
+            <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+              Cluster Group: <strong className="text-slate-600">{host.group}</strong> • Address: <strong className="text-slate-600">{host.ip}:{host.port}</strong>
             </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <StatusPill state={host.state} />
-          <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-full px-3.5 py-1.5 shadow-sm select-none">
-            <Users size={12} className="text-slate-400" />
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 rounded-full px-3 py-1 shadow-sm select-none">
+            <Users size={11} className="text-slate-400" />
             <span>{uniqueUsers(host) || 0} Logged In</span>
           </div>
-          {activeAlerts.length > 0 && (
-            <div 
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-full px-4 py-1.5 shadow-sm cursor-default transition-colors hover:bg-rose-100"
-              title={activeAlerts.map((a: any) => a.message).join('\n')}
-            >
-              <AlertTriangle size={14} className="text-rose-500 animate-pulse" />
-              <span>{activeAlerts.length} Active Warning{activeAlerts.length > 1 ? 's' : ''}</span>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Warnings List */}
-      <div className="space-y-4">
+      {/* Warnings List Content Area */}
+      <div className="p-6">
         {activeAlerts.length > 0 ? (
-          activeAlerts.map((alert, i) => {
-            const msg = alert.message.toLowerCase();
-            const isDiskAlert = msg.includes('disk') && msg.includes('used');
-            const isCpuAlert = msg.includes('cpu is');
-            const isMemAlert = msg.includes('system memory is');
-            const isVramAlert = msg.includes('vram is');
-            const isGpuMetricsAlert = msg.includes('gpu metrics unavailable') || msg.includes('nvml');
-            const isTempAlert = msg.includes('temperature') || msg.includes('temp');
+          <div className="space-y-6 divide-y divide-slate-100">
+            {activeAlerts.map((alert, i) => {
+              const msg = alert.message.toLowerCase();
+              const isDiskAlert = msg.includes('disk') && msg.includes('used');
+              const isCpuAlert = msg.includes('cpu is');
+              const isMemAlert = msg.includes('system memory is');
+              const isVramAlert = msg.includes('vram is');
+              const isGpuMetricsAlert = msg.includes('gpu metrics unavailable') || msg.includes('nvml');
+              const isTempAlert = msg.includes('temperature') || msg.includes('temp');
 
-            return (
-              <div 
-                key={i} 
-                className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4"
-              >
-                {/* Warning Card Header */}
-                <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
-                  <AlertTriangle size={16} className="text-rose-500 animate-pulse shrink-0" />
-                  <span>{alert.message}</span>
-                </div>
+              return (
+                <div 
+                  key={i} 
+                  className={`space-y-4 ${i > 0 ? 'pt-6' : ''}`}
+                >
+                  {/* Warning Header */}
+                  <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
+                    <AlertTriangle size={16} className="text-rose-500 animate-pulse shrink-0" />
+                    <span>{alert.message}</span>
+                  </div>
 
-                {/* Warning Context Details */}
-                {isDiskAlert && (
-                  <div className="space-y-4 pt-2 border-t border-slate-100">
-                    {(() => {
-                      const match = alert.message.match(/disk\s+(\S+)\s+/i);
-                      const diskPath = match ? match[1] : '/home';
-                      const targetDisk = host.disks.find(d => d.target === diskPath) || host.disks.find(d => d.target === '/home') || host.disks[0];
+                  {/* Warning Context Details */}
+                  {isDiskAlert && (
+                    <div className="space-y-4 pl-6">
+                      {(() => {
+                        const match = alert.message.match(/disk\s+(\S+)\s+/i);
+                        const diskPath = match ? match[1] : '/home';
+                        const targetDisk = host.disks.find(d => d.target === diskPath) || host.disks.find(d => d.target === '/home') || host.disks[0];
 
-                      return (
-                        <>
-                          {targetDisk && (
-                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl max-w-xl">
-                              <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-mono text-indigo-650 font-bold">{targetDisk.target}</span>
-                                  <span className="text-slate-400 font-normal">Usage</span>
+                        return (
+                          <>
+                            {targetDisk && (
+                              <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl max-w-xl shadow-inner-sm">
+                                <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono text-indigo-650 font-bold">{targetDisk.target}</span>
+                                    <span className="text-slate-400 font-normal">Capacity Usage</span>
+                                  </div>
+                                  <span className="font-mono font-bold text-slate-800">
+                                    {targetDisk.use_pct}% <span className="text-slate-400 font-normal">({mb(targetDisk.used_mb)} / {mb(targetDisk.size_mb)})</span>
+                                  </span>
                                 </div>
-                                <span className="font-mono font-bold text-slate-800">
-                                  {targetDisk.use_pct}% <span className="text-slate-400 font-normal">({mb(targetDisk.used_mb)} / {mb(targetDisk.size_mb)})</span>
-                                </span>
+                                <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                                  <div 
+                                    className={`h-full rounded-full transition-all duration-500 ${
+                                      targetDisk.use_pct >= 90 ? 'bg-rose-500' : targetDisk.use_pct >= 75 ? 'bg-amber-500' : 'bg-indigo-600'
+                                    }`}
+                                    style={{ width: `${targetDisk.use_pct}%` }}
+                                  />
+                                </div>
                               </div>
-                              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                                <div 
-                                  className={`h-full rounded-full transition-all duration-500 ${
-                                    targetDisk.use_pct >= 90 ? 'bg-rose-500' : targetDisk.use_pct >= 75 ? 'bg-amber-500' : 'bg-indigo-650'
-                                  }`}
-                                  style={{ width: `${targetDisk.use_pct}%` }}
-                                />
+                            )}
+
+                            {diskPath === '/home' && (
+                              <div className="flex flex-col min-w-0 min-h-0">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">User Directories (under /home)</span>
+                                <div className="border border-slate-150/60 rounded-xl overflow-hidden bg-slate-50/20 max-w-xl">
+                                  <div className="divide-y divide-slate-100 px-4 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {(host.user_disk ?? []).length ? (
+                                      (host.user_disk ?? [])
+                                        .sort((a, b) => b.used_mb - a.used_mb)
+                                        .map((entry, idx) => (
+                                          <div className="flex justify-between items-center gap-2 py-2.5 text-xs" key={idx}>
+                                            <span className="text-slate-650 font-semibold font-mono truncate min-w-0">/home/{entry.user}</span>
+                                            <span className="text-slate-800 font-bold font-mono shrink-0">{mb(entry.used_mb)}</span>
+                                          </div>
+                                        ))
+                                    ) : (
+                                      <span className="text-xs text-slate-400 italic block py-3 text-center">No user home space reports.</span>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
 
-                          {diskPath === '/home' && (
-                            <div className="flex flex-col min-w-0 min-h-0 pt-2">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">User Directories (under /home)</span>
-                              <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1 divide-y divide-slate-100 border border-slate-150 rounded-xl p-3 bg-slate-50/20 max-w-2xl">
-                                {(host.user_disk ?? []).length ? (
-                                  (host.user_disk ?? [])
-                                    .sort((a, b) => b.used_mb - a.used_mb)
-                                    .map((entry, idx) => (
-                                      <div className="flex justify-between items-center gap-2 py-2.5 text-xs" key={idx}>
-                                        <span className="text-slate-600 font-semibold font-mono truncate min-w-0">/home/{entry.user}</span>
-                                        <span className="text-slate-800 font-bold font-mono shrink-0">{mb(entry.used_mb)}</span>
-                                      </div>
-                                    ))
-                                ) : (
-                                  <span className="text-xs text-slate-400 italic block py-1">No user home space reports.</span>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {isCpuAlert && (
-                  <div className="space-y-4 pt-2 border-t border-slate-100 max-w-2xl">
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl max-w-xl">
-                      <div className="flex justify-between items-center text-xs font-semibold text-slate-705 mb-1.5">
-                        <span className="text-slate-707 font-bold">CPU Usage</span>
-                        <span className="font-mono font-bold text-slate-800">{cPct}%</span>
+                  {isCpuAlert && (
+                    <div className="space-y-4 pl-6 max-w-xl">
+                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl shadow-inner-sm">
+                        <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
+                          <span className="text-slate-700 font-bold">CPU Usage</span>
+                          <span className="font-mono font-bold text-slate-800">{cPct}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className="h-full rounded-full transition-all duration-500 bg-rose-500"
+                            style={{ width: `${cPct}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="h-full rounded-full transition-all duration-500 bg-rose-500"
-                          style={{ width: `${cPct}%` }}
-                        />
+
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Top CPU Processes</span>
+                        <div className="border border-slate-150/60 rounded-xl overflow-hidden bg-white shadow-sm">
+                          <table className="w-full text-left text-[11px] border-collapse">
+                            <thead>
+                              <tr className="text-slate-405 font-bold border-b border-slate-100 bg-slate-50/50">
+                                <th className="py-2 px-3.5 font-semibold w-[80px]">User</th>
+                                <th className="py-2 px-2 font-semibold w-[60px]">PID</th>
+                                <th className="py-2 px-2 font-semibold w-[60px]">CPU%</th>
+                                <th className="py-2 px-2 font-semibold w-[60px]">MEM%</th>
+                                <th className="py-2 pl-2 pr-3.5 font-semibold">COMMAND</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {(host.processes ?? [])
+                                .filter(p => Number(p.cpu || 0) > 0)
+                                .sort((a, b) => Number(b.cpu || 0) - Number(a.cpu || 0))
+                                .slice(0, 5)
+                                .map((p, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
+                                    <td className="py-2 px-3.5 text-slate-700 font-semibold">{p.user || 'root'}</td>
+                                    <td className="py-2 px-2 text-slate-505 font-mono">{p.pid}</td>
+                                    <td className="py-2 px-2 text-slate-950 font-bold">{p.cpu}%</td>
+                                    <td className="py-2 px-2 text-slate-600">{p.mem}%</td>
+                                    <td className="py-2 pl-2 pr-3.5 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
+                                      {p.cmd || p.process}
+                                    </td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
+                  )}
 
-                    <div className="space-y-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Top CPU Processes</span>
-                      <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
-                        <table className="w-full text-left text-[11px] border-collapse">
-                          <thead>
-                            <tr className="text-slate-400 font-bold border-b border-slate-100 bg-slate-50">
-                              <th className="py-2 px-3 font-semibold w-[80px]">User</th>
-                              <th className="py-2 px-2 font-semibold w-[60px]">PID</th>
-                              <th className="py-2 px-2 font-semibold w-[60px]">CPU%</th>
-                              <th className="py-2 px-2 font-semibold w-[60px]">MEM%</th>
-                              <th className="py-2 pl-2 pr-3 font-semibold">COMMAND</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-50">
-                            {(host.processes ?? [])
-                              .filter(p => Number(p.cpu || 0) > 0)
-                              .sort((a, b) => Number(b.cpu || 0) - Number(a.cpu || 0))
-                              .slice(0, 5)
-                              .map((p, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50/50">
-                                  <td className="py-2 px-3 text-slate-700 font-semibold">{p.user || 'root'}</td>
-                                  <td className="py-2 px-2 text-slate-500 font-mono">{p.pid}</td>
-                                  <td className="py-2 px-2 text-slate-900 font-bold">{p.cpu}%</td>
-                                  <td className="py-2 px-2 text-slate-600">{p.mem}%</td>
-                                  <td className="py-2 pl-2 pr-3 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
-                                    {p.cmd || p.process}
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
+                  {isMemAlert && (
+                    <div className="space-y-4 pl-6 max-w-xl">
+                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl shadow-inner-sm">
+                        <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
+                          <span className="text-slate-700 font-bold">System Memory Usage</span>
+                          <span className="font-mono font-bold text-slate-800">{mPct}% ({mb(host.memory?.used_mb)} / {mb(host.memory?.total_mb)})</span>
+                        </div>
+                        <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className="h-full rounded-full transition-all duration-500 bg-rose-500"
+                            style={{ width: `${mPct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Top Memory Processes</span>
+                        <div className="border border-slate-150/60 rounded-xl overflow-hidden bg-white shadow-sm">
+                          <table className="w-full text-left text-[11px] border-collapse">
+                            <thead>
+                              <tr className="text-slate-405 font-bold border-b border-slate-100 bg-slate-50/50">
+                                <th className="py-2 px-3.5 font-semibold w-[80px]">User</th>
+                                <th className="py-2 px-2 font-semibold w-[60px]">PID</th>
+                                <th className="py-2 px-2 font-semibold w-[60px]">CPU%</th>
+                                <th className="py-2 px-2 font-semibold w-[60px]">MEM%</th>
+                                <th className="py-2 pl-2 pr-3.5 font-semibold">COMMAND</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {(host.processes ?? [])
+                                .filter(p => Number(p.mem || 0) > 0)
+                                .sort((a, b) => Number(b.mem || 0) - Number(a.mem || 0))
+                                .slice(0, 5)
+                                .map((p, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
+                                    <td className="py-2 px-3.5 text-slate-700 font-semibold">{p.user || 'root'}</td>
+                                    <td className="py-2 px-2 text-slate-505 font-mono">{p.pid}</td>
+                                    <td className="py-2 px-2 text-slate-650">{p.cpu}%</td>
+                                    <td className="py-2 px-2 text-slate-950 font-bold">{p.mem}%</td>
+                                    <td className="py-2 pl-2 pr-3.5 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
+                                      {p.cmd || p.process}
+                                    </td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {isMemAlert && (
-                  <div className="space-y-4 pt-2 border-t border-slate-100 max-w-2xl">
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl max-w-xl">
-                      <div className="flex justify-between items-center text-xs font-semibold text-slate-705 mb-1.5">
-                        <span className="text-slate-707 font-bold">System Memory Usage</span>
-                        <span className="font-mono font-bold text-slate-800">{mPct}% ({mb(host.memory?.used_mb)} / {mb(host.memory?.total_mb)})</span>
+                  {isVramAlert && (
+                    <div className="space-y-4 pl-6 max-w-xl">
+                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl shadow-inner-sm">
+                        <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
+                          <span className="text-slate-700 font-bold">GPU VRAM Allocation</span>
+                          <span className="font-mono font-bold text-slate-800">{vPct}% ({mb(host.gpu?.mem_used_mb)} / {mb(host.gpu?.mem_total_mb)})</span>
+                        </div>
+                        <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className="h-full rounded-full transition-all duration-500 bg-rose-500"
+                            style={{ width: `${vPct}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="h-full rounded-full transition-all duration-500 bg-rose-500"
-                          style={{ width: `${mPct}%` }}
-                        />
-                      </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Top Memory Processes</span>
-                      <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
-                        <table className="w-full text-left text-[11px] border-collapse">
-                          <thead>
-                            <tr className="text-slate-400 font-bold border-b border-slate-100 bg-slate-50">
-                              <th className="py-2 px-3 font-semibold w-[80px]">User</th>
-                              <th className="py-2 px-2 font-semibold w-[60px]">PID</th>
-                              <th className="py-2 px-2 font-semibold w-[60px]">CPU%</th>
-                              <th className="py-2 px-2 font-semibold w-[60px]">MEM%</th>
-                              <th className="py-2 pl-2 pr-3 font-semibold">COMMAND</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-50">
-                            {(host.processes ?? [])
-                              .filter(p => Number(p.mem || 0) > 0)
-                              .sort((a, b) => Number(b.mem || 0) - Number(a.mem || 0))
-                              .slice(0, 5)
-                              .map((p, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50/50">
-                                  <td className="py-2 px-3 text-slate-700 font-semibold">{p.user || 'root'}</td>
-                                  <td className="py-2 px-2 text-slate-500 font-mono">{p.pid}</td>
-                                  <td className="py-2 px-2 text-slate-600">{p.cpu}%</td>
-                                  <td className="py-2 px-2 text-slate-900 font-bold">{p.mem}%</td>
-                                  <td className="py-2 pl-2 pr-3 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
-                                    {p.cmd || p.process}
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active GPU Processes</span>
+                        <div className="border border-slate-150/60 rounded-xl overflow-hidden bg-white shadow-sm">
+                          <table className="w-full text-left text-[11px] border-collapse">
+                            <thead>
+                              <tr className="text-slate-405 font-bold border-b border-slate-100 bg-slate-50/50">
+                                <th className="py-2 px-3.5 font-semibold w-[80px]">User</th>
+                                <th className="py-2 px-2 font-semibold w-[60px]">PID</th>
+                                <th className="py-2 px-2 font-semibold w-[90px]">GPU VRAM</th>
+                                <th className="py-2 pl-2 pr-3.5 font-semibold">COMMAND</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {(host.processes ?? [])
+                                .filter(p => typeof p.gpu_mem_mb === 'number' && p.gpu_mem_mb > 0)
+                                .sort((a, b) => (b.gpu_mem_mb || 0) - (a.gpu_mem_mb || 0))
+                                .slice(0, 5)
+                                .map((p, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
+                                    <td className="py-2 px-3.5 text-slate-700 font-semibold">{p.user || 'root'}</td>
+                                    <td className="py-2 px-2 text-slate-505 font-mono">{p.pid}</td>
+                                    <td className="py-2 px-2 text-slate-950 font-bold font-mono">{mb(p.gpu_mem_mb)}</td>
+                                    <td className="py-2 pl-2 pr-3.5 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
+                                      {p.cmd || p.process}
+                                    </td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {isVramAlert && (
-                  <div className="space-y-4 pt-2 border-t border-slate-100 max-w-2xl">
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl max-w-xl">
-                      <div className="flex justify-between items-center text-xs font-semibold text-slate-705 mb-1.5">
-                        <span className="text-slate-707 font-bold">GPU VRAM Allocation</span>
-                        <span className="font-mono font-bold text-slate-800">{vPct}% ({mb(host.gpu?.mem_used_mb)} / {mb(host.gpu?.mem_total_mb)})</span>
+                  {isTempAlert && host.gpu && (
+                    <div className="space-y-2 pl-6 max-w-xl">
+                      <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs shadow-inner-sm">
+                        <span className="text-slate-700 font-bold">GPU Temperature</span>
+                        <span className="font-mono font-bold text-rose-600">{host.gpu.temp_c}°C</span>
                       </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="h-full rounded-full transition-all duration-500 bg-rose-500"
-                          style={{ width: `${vPct}%` }}
-                        />
-                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        The GPU is running extremely hot. Please ensure user training runs are suspended if thermal limits are continuously exceeded.
+                      </p>
                     </div>
+                  )}
 
-                    <div className="space-y-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active GPU Processes</span>
-                      <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
-                        <table className="w-full text-left text-[11px] border-collapse">
-                          <thead>
-                            <tr className="text-slate-400 font-bold border-b border-slate-100 bg-slate-50">
-                              <th className="py-2 px-3 font-semibold w-[80px]">User</th>
-                              <th className="py-2 px-2 font-semibold w-[60px]">PID</th>
-                              <th className="py-2 px-2 font-semibold w-[90px]">GPU VRAM</th>
-                              <th className="py-2 pl-2 pr-3 font-semibold">COMMAND</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-50">
-                            {(host.processes ?? [])
-                              .filter(p => typeof p.gpu_mem_mb === 'number' && p.gpu_mem_mb > 0)
-                              .sort((a, b) => (b.gpu_mem_mb || 0) - (a.gpu_mem_mb || 0))
-                              .slice(0, 5)
-                              .map((p, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50/50">
-                                  <td className="py-2 px-3 text-slate-700 font-semibold">{p.user || 'root'}</td>
-                                  <td className="py-2 px-2 text-slate-500 font-mono">{p.pid}</td>
-                                  <td className="py-2 px-2 text-slate-900 font-bold font-mono">{mb(p.gpu_mem_mb)}</td>
-                                  <td className="py-2 pl-2 pr-3 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
-                                    {p.cmd || p.process}
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
+                  {isGpuMetricsAlert && (
+                    <div className="pl-6 max-w-xl">
+                      <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-650 leading-relaxed shadow-inner-sm">
+                        <strong className="text-slate-800">NVIDIA Driver Check:</strong> The NVIDIA driver might have crashed or requires rebuilding. Please log in to the host machine and run <code>nvidia-smi</code> for diagnostics.
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {isTempAlert && host.gpu && (
-                  <div className="space-y-2 pt-2 border-t border-slate-100 max-w-xl">
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs">
-                      <span className="text-slate-707 font-bold">GPU Temperature</span>
-                      <span className="font-mono font-bold text-rose-600">{host.gpu.temp_c}°C</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400">
-                      The GPU is running extremely hot. Please ensure user training runs are suspended if thermal limits are continuously exceeded.
-                    </p>
-                  </div>
-                )}
-
-                {isGpuMetricsAlert && (
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-600 leading-relaxed pt-2 border-t border-slate-100 max-w-xl">
-                    <strong>NVIDIA Driver Check:</strong> The nvidia driver might have crashed or requires rebuilding. Please log in to the host machine and run <code>nvidia-smi</code> to diagnostic.
-                  </div>
-                )}
-              </div>
-            );
-          })
+                  )}
+                </div>
+              );
+            })}
+          </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-400 italic text-xs shadow-sm">
+          <div className="py-12 text-center text-slate-400 italic text-xs">
             No active warnings on this node.
           </div>
         )}
