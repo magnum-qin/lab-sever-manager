@@ -1051,515 +1051,324 @@ function UserProcessesSection({ host, groups }: { host: any, groups: any[] }) {
   );
 }
 
-// 3. Specialized Workspace for Error & Diagnostic Analysis on Host Warnings
-export function AttentionNeededWorkspace({ hosts, selectedHost, onSelectHost, pollSeconds = 2 }: {
-  hosts: HostStatus[];
-  selectedHost: string | null;
-  onSelectHost: (name: string) => void;
+type HostWarningDetailsViewProps = {
+  host: HostStatus;
   pollSeconds?: number;
-}) {
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+};
 
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
+export function HostWarningDetailsView({ host, pollSeconds = 2 }: HostWarningDetailsViewProps) {
+  const isDown = host.state === 'down' || !host.agent_reachable;
 
-  // Find active host
-  const activeHost = hosts.find(h => h.name === selectedHost) || hosts[0] || null;
-
-  if (hosts.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 px-6 border border-emerald-100 rounded-2xl bg-white shadow-sm max-w-2xl mx-auto my-8">
-        <div className="h-16 w-16 rounded-full bg-emerald-50 border-4 border-emerald-100 flex items-center justify-center text-emerald-550 mb-5 animate-bounce">
-          <Check size={32} className="stroke-[3]" />
-        </div>
-        <h3 className="text-lg font-bold text-slate-800">All Nodes Operational</h3>
-        <p className="text-sm text-slate-400 text-center mt-2 max-w-md">
-          Great job! There are currently no active warnings, errors, or offline cluster agents reported. All systems are running healthy.
-        </p>
-      </div>
-    );
-  }
-
-  // Get diagnostic helper
-  const getDiagnosticInfo = (message: string, host: HostStatus) => {
-    const msg = message.toLowerCase();
-    const ip = host.ip;
-    if (msg.includes('agent is unreachable') || !host.agent_reachable || host.state === 'down') {
-      return {
-        title: 'Agent Connection Timeout',
-        suspectedCause: 'The host machine is either powered off, network disconnected, or the gpu-status-agent daemon has crashed.',
-        steps: [
-          'Ping the host IP address to check basic ICMP connectivity.',
-          'Connect via SSH to check system status.',
-          'Verify and restart the status agent daemon.'
-        ],
-        cmd: `ping -c 3 ${ip} || ssh -t ${ip} "sudo systemctl restart gpu-status-agent"`
-      };
-    }
-    if (msg.includes('disk') && msg.includes('used')) {
-      const match = message.match(/disk\s+(\S+)\s+/i);
-      const diskPath = match ? match[1] : '/home';
-      return {
-        title: 'High Disk Space Usage',
-        suspectedCause: `The volume mounted at '${diskPath}' is nearing full capacity. Runaway logs, unchecked model caching, or large datasets may be the cause.`,
-        steps: [
-          `Scan directory sizes under ${diskPath} to find large folders.`,
-          'Clean Hugging Face cache using huggingface-cli or clean VS Code server logs.',
-          'Remove dangling Docker layers/images if docker is running on this disk.'
-        ],
-        cmd: `ssh -t ${ip} "du -sh ${diskPath}/* 2>/dev/null | sort -rh | head -n 15"`
-      };
-    }
-    if (msg.includes('gpu metrics unavailable') || msg.includes('nvml')) {
-      return {
-        title: 'NVIDIA Driver / NVML Issue',
-        suspectedCause: 'NVML/NVIDIA driver could not be loaded. This happens after kernel upgrades without DKMS rebuilds, or PCIe bus lockups.',
-        steps: [
-          'Run nvidia-smi on the host to check the exact driver error.',
-          'Check kernel logs using dmesg for NVML or PCIe training errors.',
-          'Try reloading the nvidia driver modules or schedule a system reboot.'
-        ],
-        cmd: `ssh -t ${ip} "nvidia-smi || dmesg | grep -i -E 'nvidia|nvrrm|pcie' | tail -n 20"`
-      };
-    }
-    if (msg.includes('temperature') || msg.includes('temp')) {
-      return {
-        title: 'GPU Temperature Throttling',
-        suspectedCause: 'One or more GPUs have exceeded 86°C. Performance will be throttled. This points to high continuous workload, fan failure, or ventilation blockage.',
-        steps: [
-          'Query GPU stats including temperature and fan speeds.',
-          'Identify hot running processes and contact the owning users.',
-          'Ensure the host chassis has sufficient airflow.'
-        ],
-        cmd: `ssh -t ${ip} "nvidia-smi --query-gpu=index,temperature.gpu,fan.speed,power.draw --format=csv"`
-      };
-    }
-    if (msg.includes('cpu is')) {
-      return {
-        title: 'High CPU Load',
-        suspectedCause: 'CPU utilization exceeds 90%. System responsiveness might be degraded. Typical causes are multi-threaded compilation or CPU-bound Python scripts.',
-        steps: [
-          'Find the top CPU-consuming user processes.',
-          'Determine if these processes are runaways (running for days with no progress).',
-          'Coordinate CPU cores allocations with logged-in users.'
-        ],
-        cmd: `ssh -t ${ip} "ps -eo pid,user,%cpu,%mem,comm --sort=-%cpu | head -n 12"`
-      };
-    }
-    if (msg.includes('system memory is')) {
-      return {
-        title: 'High System RAM Allocation',
-        suspectedCause: 'Physical memory allocation exceeds 90%. Out-of-memory (OOM) killer activation is highly probable.',
-        steps: [
-          'List the processes with high resident memory (RSS).',
-          'Check swap space usage to see if thrashing is occurring.',
-          'Verify if any inactive VS Code server instances or Jupyter kernels can be safely closed.'
-        ],
-        cmd: `ssh -t ${ip} "ps -eo pid,user,%mem,rss,comm --sort=-rss | head -n 12"`
-      };
-    }
-    if (msg.includes('vram is')) {
-      return {
-        title: 'High GPU VRAM Allocation',
-        suspectedCause: 'GPU VRAM allocation exceeds 90%. New training or inference sessions on this GPU will fail with Out of Memory errors.',
-        steps: [
-          'List all active processes running on the GPU and their VRAM allocations.',
-          'Check if there are inactive VRAM-holding servers (e.g. idle vLLM/Ollama).',
-          'Use Unsloth Studio or Ollama APIs to unload models not in active use.'
-        ],
-        cmd: `ssh -t ${ip} "nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv"`
-      };
-    }
-    return {
-      title: 'System Performance Alert',
-      suspectedCause: `An alert was triggered: "${message}".`,
-      steps: [
-        'Log in to the host to check the system resource status.',
-        'Review the system journal logs (`journalctl -xe`).'
-      ],
-      cmd: `ssh -t ${ip} "journalctl -n 50 --no-pager"`
-    };
-  };
-
-  // Compile active alerts for selected host
-  const activeAlerts = activeHost ? [...(activeHost.alerts || [])] : [];
-  if (activeHost && (!activeHost.agent_reachable || activeHost.state === 'down')) {
+  // Compute active alerts
+  const activeAlerts = [...(host.alerts || [])];
+  if (isDown) {
     const hasConnectionAlert = activeAlerts.some(a => a.message.toLowerCase().includes('unreachable'));
     if (!hasConnectionAlert) {
       activeAlerts.unshift({
         level: 'critical',
-        message: `${activeHost.name} agent is unreachable`
+        message: `${host.name} agent is unreachable`
       });
     }
   }
 
-  // Filter process list for resource hogs
-  const resourceHogs = activeHost ? (activeHost.processes || [])
-    .filter(p => {
-      const cpu = Number(p.cpu || 0);
-      const mem = Number(p.mem || 0);
-      const hasGpu = typeof p.gpu_mem_mb === 'number' && p.gpu_mem_mb > 0;
-      return cpu > 5 || mem > 1 || hasGpu;
-    })
-    .sort((a, b) => {
-      const cpuDiff = Number(b.cpu || 0) - Number(a.cpu || 0);
-      if (Math.abs(cpuDiff) > 1) return cpuDiff;
-      return (b.gpu_mem_mb || 0) - (a.gpu_mem_mb || 0);
-    }) : [];
+  // CPU percent helper
+  const cPct = cpuPct(host);
+  // Memory percent helper
+  const mPct = memoryPct(host);
+  // VRAM percent helper
+  const vPct = vramPct(host);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-      {/* 1. Left side: Hosts listing with active issues */}
-      <div className="lg:col-span-1 space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Servers Requiring Action
-          </h3>
-          <span className="text-xs font-semibold text-rose-650 bg-rose-50 border border-rose-100 rounded-full px-2 py-0.5">
-            {hosts.length} Affected
-          </span>
+    <div className="space-y-6">
+      {/* Selected Host Header Summary (Identical to HostDetailsView) */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 shrink-0">
+            <Server size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-slate-900">{host.name}</h2>
+              <span className={`h-2 w-2 rounded-full ${isDown ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Cluster Group: <strong className="text-slate-600">{host.group}</strong> • Host Address: <strong className="text-slate-600">{host.ip}:{host.port}</strong>
+            </p>
+          </div>
         </div>
-
-        <div className="space-y-2.5 max-h-[70vh] overflow-y-auto pr-1">
-          {hosts.map(h => {
-            const active = h.name === activeHost?.name;
-            const isCritical = !h.agent_reachable || h.state === 'down';
-            const alertCount = (h.alerts || []).length || (isCritical ? 1 : 0);
-
-            return (
-              <div
-                key={h.name}
-                onClick={() => onSelectHost(h.name)}
-                className={`rounded-xl border p-4 cursor-pointer transition-all duration-200 select-none flex flex-col justify-between gap-3 ${
-                  active
-                    ? 'border-indigo-650 ring-2 ring-indigo-500/20 bg-indigo-50/15 shadow-sm'
-                    : 'border-slate-200 bg-white hover:border-slate-355 hover:shadow-md'
-                }`}
-              >
-                <div className="flex justify-between items-start gap-2">
-                  <div>
-                    <span className="font-bold text-slate-800 text-sm block leading-tight">{h.name}</span>
-                    <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">
-                      {h.group} • {h.ip}
-                    </span>
-                  </div>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold border shrink-0 ${
-                    isCritical
-                      ? 'bg-rose-50 text-rose-700 border-rose-200'
-                      : 'bg-amber-50 text-amber-800 border-amber-200'
-                  }`}>
-                    {isCritical ? 'CRITICAL' : `${alertCount} ALERT${alertCount > 1 ? 'S' : ''}`}
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 border-t border-slate-100 pt-2.5">
-                  {(h.alerts && h.alerts.length > 0) ? (
-                    h.alerts.slice(0, 2).map((a, idx) => (
-                      <div key={idx} className="flex items-start gap-1.5 text-[11px] text-slate-600 font-medium">
-                        <AlertTriangle size={12} className={`shrink-0 mt-0.5 ${a.level === 'critical' ? 'text-rose-500' : 'text-amber-500'}`} />
-                        <span className="truncate">{a.message}</span>
-                      </div>
-                    ))
-                  ) : isCritical ? (
-                    <div className="flex items-start gap-1.5 text-[11px] text-slate-600 font-medium">
-                      <AlertTriangle size={12} className="shrink-0 mt-0.5 text-rose-500" />
-                      <span className="truncate">Node connection unreachable</span>
-                    </div>
-                  ) : null}
-                  {(h.alerts || []).length > 2 && (
-                    <span className="text-[9px] text-slate-400 font-bold block pl-4">
-                      + {(h.alerts || []).length - 2} more active warnings
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+        
+        <div className="flex items-center gap-3">
+          <StatusPill state={host.state} />
+          <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-full px-3.5 py-1.5 shadow-sm select-none">
+            <Users size={12} className="text-slate-400" />
+            <span>{uniqueUsers(host) || 0} Logged In</span>
+          </div>
+          {activeAlerts.length > 0 && (
+            <div 
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-full px-4 py-1.5 shadow-sm cursor-default transition-colors hover:bg-rose-100"
+              title={activeAlerts.map((a: any) => a.message).join('\n')}
+            >
+              <AlertTriangle size={14} className="text-rose-500 animate-pulse" />
+              <span>{activeAlerts.length} Active Warning{activeAlerts.length > 1 ? 's' : ''}</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 2. Right side: Expert Diagnostics & Analysis Panel */}
-      <div className="lg:col-span-2 space-y-5">
-        {activeHost ? (
-          <>
-            {/* Header / Summary */}
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-bold text-slate-900">{activeHost.name}</h2>
-                  <span className={`h-2.5 w-2.5 rounded-full ${(!activeHost.agent_reachable || activeHost.state === 'down') ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
+      {/* Warnings List */}
+      <div className="space-y-4">
+        {activeAlerts.length > 0 ? (
+          activeAlerts.map((alert, i) => {
+            const msg = alert.message.toLowerCase();
+            const isDiskAlert = msg.includes('disk') && msg.includes('used');
+            const isCpuAlert = msg.includes('cpu is');
+            const isMemAlert = msg.includes('system memory is');
+            const isVramAlert = msg.includes('vram is');
+            const isGpuMetricsAlert = msg.includes('gpu metrics unavailable') || msg.includes('nvml');
+            const isTempAlert = msg.includes('temperature') || msg.includes('temp');
+
+            return (
+              <div 
+                key={i} 
+                className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4"
+              >
+                {/* Warning Card Header */}
+                <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
+                  <AlertTriangle size={16} className="text-rose-500 animate-pulse shrink-0" />
+                  <span>{alert.message}</span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  Host Address: <strong className="text-slate-600 font-mono">{activeHost.ip}:{activeHost.port}</strong> • Group: <strong className="text-slate-600">{activeHost.group}</strong>
-                </p>
-              </div>
 
-              <div className="flex gap-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  (!activeHost.agent_reachable || activeHost.state === 'down')
-                    ? 'bg-rose-50 border border-rose-200 text-rose-700'
-                    : activeHost.state === 'busy'
-                    ? 'bg-amber-50 border border-amber-200 text-amber-700'
-                    : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                }`}>
-                  Status: {(!activeHost.agent_reachable || activeHost.state === 'down') ? 'Offline' : activeHost.state.toUpperCase()}
-                </span>
-              </div>
-            </div>
+                {/* Warning Context Details */}
+                {isDiskAlert && (
+                  <div className="space-y-4 pt-2 border-t border-slate-100">
+                    {(() => {
+                      const match = alert.message.match(/disk\s+(\S+)\s+/i);
+                      const diskPath = match ? match[1] : '/home';
+                      const targetDisk = host.disks.find(d => d.target === diskPath) || host.disks.find(d => d.target === '/home') || host.disks[0];
 
-            {/* Alert Specific Diagnostics */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
-                Diagnostic Analysis & Action Plan
-              </h3>
-
-              {activeAlerts.map((alert, i) => {
-                const diag = getDiagnosticInfo(alert.message, activeHost);
-                const isCritical = alert.level === 'critical';
-
-                return (
-                  <div
-                    key={i}
-                    className={`border rounded-xl p-5 shadow-sm space-y-4 bg-white ${
-                      isCritical ? 'border-rose-200' : 'border-amber-200'
-                    }`}
-                  >
-                    {/* Title & Level */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle size={18} className={isCritical ? 'text-rose-500 animate-pulse' : 'text-amber-500'} />
-                        <h4 className="font-bold text-slate-800 text-sm">{diag.title}</h4>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        isCritical ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {alert.level}
-                      </span>
-                    </div>
-
-                    {/* Original Alert Message */}
-                    <div className="text-xs font-mono bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-slate-600">
-                      <strong>Raw Alert:</strong> {alert.message}
-                    </div>
-
-                    {/* Suspected Cause */}
-                    <div className="text-xs text-slate-600 leading-relaxed">
-                      <span className="font-bold text-slate-800 block mb-1">🔍 Suspected Root Cause:</span>
-                      {diag.suspectedCause}
-                    </div>
-
-                    {/* Troubleshooting Checklist */}
-                    <div className="text-xs text-slate-650 space-y-1.5">
-                      <span className="font-bold text-slate-800 block mb-1">🛠️ Recommended Action Items:</span>
-                      {diag.steps.map((step, idx) => (
-                        <div key={idx} className="flex items-start gap-2">
-                          <span className="text-indigo-650 font-bold shrink-0">{idx + 1}.</span>
-                          <span>{step}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Copiable Diagnostic command */}
-                    <div className="space-y-1.5 pt-1">
-                      <span className="font-bold text-slate-800 text-xs block">💻 Run Diagnostic Command:</span>
-                      <div className="bg-slate-900 text-slate-100 rounded-lg p-3 font-mono text-[11px] flex justify-between items-center border border-slate-950 shadow-inner group overflow-hidden">
-                        <span className="truncate pr-4 text-emerald-400 select-all">{diag.cmd}</span>
-                        <button
-                          onClick={() => handleCopy(diag.cmd, `${activeHost.name}-cmd-${i}`)}
-                          className="shrink-0 p-1.5 rounded bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-slate-100 transition-colors"
-                          title="Copy command to clipboard"
-                        >
-                          {copiedId === `${activeHost.name}-cmd-${i}` ? (
-                            <div className="flex items-center gap-1 text-emerald-400 text-[10px] font-bold">
-                              <Check size={12} className="stroke-[2.5]" />
-                              <span>Copied</span>
-                            </div>
-                          ) : (
-                            <Copy size={12} />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Diagnostic resource breakdown metrics (Disk spaces / active processes / logins) */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
-                Diagnostic Context Details
-              </h3>
-
-              {activeHost.agent_reachable ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Disk volumes / Home Breakdown (highly visible if disk alert is active) */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4 md:col-span-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-                        <HardDrive size={15} className="text-indigo-650" />
-                        <span>Home Space Disk Breakdown</span>
-                      </div>
-                      {(() => {
-                        const homeDisk = (activeHost.disks ?? []).find(d => d.target === '/home') || (activeHost.disks ?? []).find(d => d.target === '/');
-                        return homeDisk ? (
-                          <span className="text-xs font-mono font-bold text-slate-650 bg-slate-50 border border-slate-150 rounded px-2 py-0.5">
-                            Total: {homeDisk.use_pct}% ({mb(homeDisk.used_mb)} / {mb(homeDisk.size_mb)})
-                          </span>
-                        ) : null;
-                      })()}
-                    </div>
-
-                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 divide-y divide-slate-100">
-                      {(activeHost.user_disk && activeHost.user_disk.length > 0) ? (
-                        activeHost.user_disk
-                          .sort((a, b) => b.used_mb - a.used_mb)
-                          .map((entry, idx) => {
-                            const isLarge = entry.used_mb > 100 * 1024; // > 100 GB
-                            const isHuge = entry.used_mb > 500 * 1024; // > 500 GB
-
-                            return (
-                              <div key={idx} className="flex justify-between items-center py-2.5 gap-4">
-                                <div className="min-w-0">
-                                  <span className="font-mono text-xs font-semibold text-slate-700 block truncate">
-                                    /home/{entry.user}
-                                  </span>
-                                  {isHuge ? (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-rose-50 text-rose-700 border border-rose-200 mt-0.5">
-                                      Critical space consumer
-                                    </span>
-                                  ) : isLarge ? (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 text-amber-800 border border-amber-200 mt-0.5">
-                                      Warning: {mb(entry.used_mb)}
-                                    </span>
-                                  ) : null}
+                      return (
+                        <>
+                          {targetDisk && (
+                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl max-w-xl">
+                              <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-indigo-650 font-bold">{targetDisk.target}</span>
+                                  <span className="text-slate-400 font-normal">Usage</span>
                                 </div>
-
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <span className="font-mono font-bold text-slate-800 text-xs">
-                                    {mb(entry.used_mb)}
-                                  </span>
-
-                                  {/* Quick help ping copy button */}
-                                  <button
-                                    onClick={() => handleCopy(
-                                      `@${entry.user} Hello, your directory /home/${entry.user} on host ${activeHost.name} is currently consuming ${mb(entry.used_mb)} space. Please run Hugging Face cleanup or delete unused files to free up disk space. Thanks!`,
-                                      `${activeHost.name}-notify-${idx}`
-                                    )}
-                                    className="p-1 rounded bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-500 hover:text-indigo-600 transition-colors"
-                                    title="Copy slack notification template"
-                                  >
-                                    {copiedId === `${activeHost.name}-notify-${idx}` ? (
-                                      <Check size={11} className="text-emerald-550 stroke-[2.5]" />
-                                    ) : (
-                                      <Users size={11} />
-                                    )}
-                                  </button>
-                                </div>
+                                <span className="font-mono font-bold text-slate-800">
+                                  {targetDisk.use_pct}% <span className="text-slate-400 font-normal">({mb(targetDisk.used_mb)} / {mb(targetDisk.size_mb)})</span>
+                                </span>
                               </div>
-                            );
-                          })
-                      ) : (
-                        <span className="text-xs text-slate-400 italic block py-2">No user directories reports.</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Active Logins */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
-                    <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-                      <Users size={15} className="text-slate-605" />
-                      <span>Currently Logged In ({activeHost.logins?.length || 0})</span>
-                    </div>
-
-                    <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
-                      {(activeHost.logins && activeHost.logins.length > 0) ? (
-                        activeHost.logins.map((login, idx) => (
-                          <div key={idx} className="flex justify-between items-center text-xs border-b border-slate-55 py-1.5">
-                            <span className="font-semibold text-slate-700 font-mono">{login.user}</span>
-                            <span className="text-slate-400 font-mono text-[10px] truncate max-w-[120px]" title={`TTY: ${login.tty} IP: ${login.host}`}>
-                              {login.time}
-                            </span>
-                          </div>
-                        ))
-                      ) : (
-                        <span className="text-xs text-slate-400 italic block py-1">No active SSH logins.</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Resource Hog processes */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3 md:col-span-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-                        <Activity size={15} className="text-slate-650" />
-                        <span>Active Resource Hogs</span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-bold">
-                        (CPU &gt; 5%, Mem &gt; 1% or using GPU)
-                      </span>
-                    </div>
-
-                    <div className="overflow-x-auto w-full">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="text-slate-400 font-bold border-b border-slate-100">
-                            <th className="py-2 px-3 font-semibold">User</th>
-                            <th className="py-2 px-1 font-semibold">PID</th>
-                            <th className="py-2 px-1 font-semibold">CPU</th>
-                            <th className="py-2 px-1 font-semibold">MEM</th>
-                            <th className="py-2 px-2 font-semibold">GPU VRAM</th>
-                            <th className="py-2 px-2 font-semibold">COMMAND</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                          {resourceHogs.length > 0 ? (
-                            resourceHogs.slice(0, 15).map((proc, idx) => (
-                              <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                                <td className="py-2 px-3 font-semibold text-slate-700">{proc.user}</td>
-                                <td className="py-2 px-1 font-mono text-slate-500">{proc.pid}</td>
-                                <td className="py-2 px-1 font-semibold text-slate-650">{proc.cpu || 0}%</td>
-                                <td className="py-2 px-1 text-slate-600">{proc.mem || 0}%</td>
-                                <td className="py-2 px-2 text-slate-600 font-mono">
-                                  {proc.gpu_mem_mb ? mb(proc.gpu_mem_mb) : '-'}
-                                </td>
-                                <td
-                                  className="py-2 px-2 font-mono text-slate-600 truncate max-w-[220px]"
-                                  title={proc.cmd || proc.process}
-                                >
-                                  {proc.cmd || proc.process || '-'}
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={6} className="py-4 text-center text-xs text-slate-400 italic">
-                                No resource-hogging processes running currently.
-                              </td>
-                            </tr>
+                              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    targetDisk.use_pct >= 90 ? 'bg-rose-500' : targetDisk.use_pct >= 75 ? 'bg-amber-500' : 'bg-indigo-650'
+                                  }`}
+                                  style={{ width: `${targetDisk.use_pct}%` }}
+                                />
+                              </div>
+                            </div>
                           )}
-                        </tbody>
-                      </table>
+
+                          {diskPath === '/home' && (
+                            <div className="flex flex-col min-w-0 min-h-0 pt-2">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">User Directories (under /home)</span>
+                              <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1 divide-y divide-slate-100 border border-slate-150 rounded-xl p-3 bg-slate-50/20 max-w-2xl">
+                                {(host.user_disk ?? []).length ? (
+                                  (host.user_disk ?? [])
+                                    .sort((a, b) => b.used_mb - a.used_mb)
+                                    .map((entry, idx) => (
+                                      <div className="flex justify-between items-center gap-2 py-2.5 text-xs" key={idx}>
+                                        <span className="text-slate-600 font-semibold font-mono truncate min-w-0">/home/{entry.user}</span>
+                                        <span className="text-slate-800 font-bold font-mono shrink-0">{mb(entry.used_mb)}</span>
+                                      </div>
+                                    ))
+                                ) : (
+                                  <span className="text-xs text-slate-400 italic block py-1">No user home space reports.</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {isCpuAlert && (
+                  <div className="space-y-4 pt-2 border-t border-slate-100 max-w-2xl">
+                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl max-w-xl">
+                      <div className="flex justify-between items-center text-xs font-semibold text-slate-705 mb-1.5">
+                        <span className="text-slate-707 font-bold">CPU Usage</span>
+                        <span className="font-mono font-bold text-slate-800">{cPct}%</span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-500 bg-rose-500"
+                          style={{ width: `${cPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Top CPU Processes</span>
+                      <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+                        <table className="w-full text-left text-[11px] border-collapse">
+                          <thead>
+                            <tr className="text-slate-400 font-bold border-b border-slate-100 bg-slate-50">
+                              <th className="py-2 px-3 font-semibold w-[80px]">User</th>
+                              <th className="py-2 px-2 font-semibold w-[60px]">PID</th>
+                              <th className="py-2 px-2 font-semibold w-[60px]">CPU%</th>
+                              <th className="py-2 px-2 font-semibold w-[60px]">MEM%</th>
+                              <th className="py-2 pl-2 pr-3 font-semibold">COMMAND</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {(host.processes ?? [])
+                              .filter(p => Number(p.cpu || 0) > 0)
+                              .sort((a, b) => Number(b.cpu || 0) - Number(a.cpu || 0))
+                              .slice(0, 5)
+                              .map((p, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/50">
+                                  <td className="py-2 px-3 text-slate-700 font-semibold">{p.user || 'root'}</td>
+                                  <td className="py-2 px-2 text-slate-500 font-mono">{p.pid}</td>
+                                  <td className="py-2 px-2 text-slate-900 font-bold">{p.cpu}%</td>
+                                  <td className="py-2 px-2 text-slate-600">{p.mem}%</td>
+                                  <td className="py-2 pl-2 pr-3 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
+                                    {p.cmd || p.process}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-5 text-center shadow-sm space-y-2">
-                  <Info className="text-rose-500 mx-auto" size={20} />
-                  <h4 className="font-bold text-slate-800 text-sm">Host System Offline</h4>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                    Because the monitoring agent is currently unreachable, detailed disk breakdowns, SSH logins list, and system processes table cannot be fetched. Please restore connectivity first.
-                  </p>
-                </div>
-              )}
-            </div>
-          </>
+                )}
+
+                {isMemAlert && (
+                  <div className="space-y-4 pt-2 border-t border-slate-100 max-w-2xl">
+                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl max-w-xl">
+                      <div className="flex justify-between items-center text-xs font-semibold text-slate-705 mb-1.5">
+                        <span className="text-slate-707 font-bold">System Memory Usage</span>
+                        <span className="font-mono font-bold text-slate-800">{mPct}% ({mb(host.memory?.used_mb)} / {mb(host.memory?.total_mb)})</span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-500 bg-rose-500"
+                          style={{ width: `${mPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Top Memory Processes</span>
+                      <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+                        <table className="w-full text-left text-[11px] border-collapse">
+                          <thead>
+                            <tr className="text-slate-400 font-bold border-b border-slate-100 bg-slate-50">
+                              <th className="py-2 px-3 font-semibold w-[80px]">User</th>
+                              <th className="py-2 px-2 font-semibold w-[60px]">PID</th>
+                              <th className="py-2 px-2 font-semibold w-[60px]">CPU%</th>
+                              <th className="py-2 px-2 font-semibold w-[60px]">MEM%</th>
+                              <th className="py-2 pl-2 pr-3 font-semibold">COMMAND</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {(host.processes ?? [])
+                              .filter(p => Number(p.mem || 0) > 0)
+                              .sort((a, b) => Number(b.mem || 0) - Number(a.mem || 0))
+                              .slice(0, 5)
+                              .map((p, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/50">
+                                  <td className="py-2 px-3 text-slate-700 font-semibold">{p.user || 'root'}</td>
+                                  <td className="py-2 px-2 text-slate-500 font-mono">{p.pid}</td>
+                                  <td className="py-2 px-2 text-slate-600">{p.cpu}%</td>
+                                  <td className="py-2 px-2 text-slate-900 font-bold">{p.mem}%</td>
+                                  <td className="py-2 pl-2 pr-3 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
+                                    {p.cmd || p.process}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isVramAlert && (
+                  <div className="space-y-4 pt-2 border-t border-slate-100 max-w-2xl">
+                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl max-w-xl">
+                      <div className="flex justify-between items-center text-xs font-semibold text-slate-705 mb-1.5">
+                        <span className="text-slate-707 font-bold">GPU VRAM Allocation</span>
+                        <span className="font-mono font-bold text-slate-800">{vPct}% ({mb(host.gpu?.mem_used_mb)} / {mb(host.gpu?.mem_total_mb)})</span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-500 bg-rose-500"
+                          style={{ width: `${vPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active GPU Processes</span>
+                      <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+                        <table className="w-full text-left text-[11px] border-collapse">
+                          <thead>
+                            <tr className="text-slate-400 font-bold border-b border-slate-100 bg-slate-50">
+                              <th className="py-2 px-3 font-semibold w-[80px]">User</th>
+                              <th className="py-2 px-2 font-semibold w-[60px]">PID</th>
+                              <th className="py-2 px-2 font-semibold w-[90px]">GPU VRAM</th>
+                              <th className="py-2 pl-2 pr-3 font-semibold">COMMAND</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {(host.processes ?? [])
+                              .filter(p => typeof p.gpu_mem_mb === 'number' && p.gpu_mem_mb > 0)
+                              .sort((a, b) => (b.gpu_mem_mb || 0) - (a.gpu_mem_mb || 0))
+                              .slice(0, 5)
+                              .map((p, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/50">
+                                  <td className="py-2 px-3 text-slate-700 font-semibold">{p.user || 'root'}</td>
+                                  <td className="py-2 px-2 text-slate-500 font-mono">{p.pid}</td>
+                                  <td className="py-2 px-2 text-slate-900 font-bold font-mono">{mb(p.gpu_mem_mb)}</td>
+                                  <td className="py-2 pl-2 pr-3 text-slate-600 font-mono truncate max-w-[200px]" title={p.cmd || p.process}>
+                                    {p.cmd || p.process}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isTempAlert && host.gpu && (
+                  <div className="space-y-2 pt-2 border-t border-slate-100 max-w-xl">
+                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs">
+                      <span className="text-slate-707 font-bold">GPU Temperature</span>
+                      <span className="font-mono font-bold text-rose-600">{host.gpu.temp_c}°C</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      The GPU is running extremely hot. Please ensure user training runs are suspended if thermal limits are continuously exceeded.
+                    </p>
+                  </div>
+                )}
+
+                {isGpuMetricsAlert && (
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-600 leading-relaxed pt-2 border-t border-slate-100 max-w-xl">
+                    <strong>NVIDIA Driver Check:</strong> The nvidia driver might have crashed or requires rebuilding. Please log in to the host machine and run <code>nvidia-smi</code> to diagnostic.
+                  </div>
+                )}
+              </div>
+            );
+          })
         ) : (
-          <div className="bg-white border border-slate-200 rounded-xl p-10 text-center shadow-sm text-slate-400 italic text-sm">
-            Select a server from the action list to analyze its warnings.
+          <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-400 italic text-xs shadow-sm">
+            No active warnings on this node.
           </div>
         )}
       </div>
