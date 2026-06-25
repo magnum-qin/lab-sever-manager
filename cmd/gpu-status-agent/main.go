@@ -138,14 +138,9 @@ func unslothStatusHandler(token string) http.HandlerFunc {
 		}
 
 		vramUsed := 0
-		out, err := exec.Command("nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits").Output()
-		if err == nil {
-			lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-			for _, line := range lines {
-				if v, err := strconv.Atoi(strings.TrimSpace(line)); err == nil {
-					vramUsed += v
-				}
-			}
+		if running {
+			pids := getUnslothPIDs()
+			vramUsed = getUnslothVramUsed(pids)
 		}
 
 		status := UnslothStatus{
@@ -216,24 +211,18 @@ func autoUnloadDaemon() {
 		}
 
 		// Get VRAM and Util
-		out, err := exec.Command("nvidia-smi", "--query-gpu=memory.used,utilization.gpu", "--format=csv,noheader,nounits").Output()
+		out, err := exec.Command("nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits").Output()
 		if err != nil {
 			continue
 		}
 
-		vramUsed := 0
+		vramUsed := getUnslothVramUsed(getUnslothPIDs())
 		maxUtil := 0
 		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 		for _, line := range lines {
-			parts := strings.Split(line, ",")
-			if len(parts) >= 2 {
-				if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil {
-					vramUsed += v
-				}
-				if u, err := strconv.Atoi(strings.TrimSpace(parts[1])); err == nil {
-					if u > maxUtil {
-						maxUtil = u
-					}
+			if u, err := strconv.Atoi(strings.TrimSpace(line)); err == nil {
+				if u > maxUtil {
+					maxUtil = u
 				}
 			}
 		}
@@ -256,4 +245,86 @@ func autoUnloadDaemon() {
 		}
 		idleMu.Unlock()
 	}
+}
+
+func getUnslothPIDs() []int {
+	pids := []int{}
+	
+	// 1. Get MainPID
+	cmd := exec.Command("systemctl", "--user", "show", "unsloth-studio.service", "-p", "MainPID", "--value")
+	out, err := cmd.Output()
+	if err == nil {
+		mainPidStr := strings.TrimSpace(string(out))
+		if mainPid, err := strconv.Atoi(mainPidStr); err == nil && mainPid > 0 {
+			pids = append(pids, mainPid)
+		}
+	}
+	
+	// 2. Try get all PIDs from cgroup
+	cgCmd := exec.Command("systemctl", "--user", "show", "unsloth-studio.service", "-p", "ControlGroup", "--value")
+	cgOut, err := cgCmd.Output()
+	if err == nil {
+		cgPath := strings.TrimSpace(string(cgOut))
+		if cgPath != "" {
+			paths := []string{
+				filepath.Join("/sys/fs/cgroup", cgPath, "cgroup.procs"),
+				filepath.Join("/sys/fs/cgroup/systemd", cgPath, "cgroup.procs"),
+			}
+			for _, p := range paths {
+				data, err := os.ReadFile(p)
+				if err == nil {
+					lines := strings.Split(string(data), "\n")
+					for _, line := range lines {
+						if pid, err := strconv.Atoi(strings.TrimSpace(line)); err == nil && pid > 0 {
+							exists := false
+							for _, existing := range pids {
+								if existing == pid {
+									exists = true
+									break
+								}
+							}
+							if !exists {
+								pids = append(pids, pid)
+							}
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+	
+	return pids
+}
+
+func getUnslothVramUsed(pids []int) int {
+	if len(pids) == 0 {
+		return 0
+	}
+	
+	totalUsed := 0
+	out, err := exec.Command("nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits").Output()
+	if err == nil {
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		for _, line := range lines {
+			parts := strings.Split(line, ",")
+			if len(parts) == 2 {
+				pidStr := strings.TrimSpace(parts[0])
+				memStr := strings.TrimSpace(parts[1])
+				
+				pid, err1 := strconv.Atoi(pidStr)
+				mem, err2 := strconv.Atoi(memStr)
+				
+				if err1 == nil && err2 == nil {
+					for _, targetPid := range pids {
+						if targetPid == pid {
+							totalUsed += mem
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+	return totalUsed
 }
