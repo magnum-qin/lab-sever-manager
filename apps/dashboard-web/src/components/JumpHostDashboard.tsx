@@ -42,7 +42,11 @@ interface PortProxyMapping {
 }
 
 const formatGB = (bytes: number) => {
-  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1000) {
+    return (gb / 1024).toFixed(1) + ' TB';
+  }
+  return gb.toFixed(1) + ' GB';
 };
 
 const formatKBtoGB = (kb: number) => {
