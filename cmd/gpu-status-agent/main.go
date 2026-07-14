@@ -27,6 +27,7 @@ type UnslothStatus struct {
 	Running        bool   `json:"running"`
 	VRAMUsedMB     int    `json:"vram_used_mb"`
 	TimeoutMinutes int    `json:"timeout_minutes"`
+	ActiveModel    string `json:"active_model"`
 }
 
 func main() {
@@ -138,9 +139,11 @@ func unslothStatusHandler(token string) http.HandlerFunc {
 		}
 
 		vramUsed := 0
+		activeModel := ""
 		if running {
 			pids := getUnslothPIDs()
 			vramUsed = getUnslothVramUsed(pids)
+			activeModel = getActiveModel()
 		}
 
 		status := UnslothStatus{
@@ -148,6 +151,7 @@ func unslothStatusHandler(token string) http.HandlerFunc {
 			Running:        running,
 			VRAMUsedMB:     vramUsed,
 			TimeoutMinutes: getTimeoutMinutes(),
+			ActiveModel:    activeModel,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -327,4 +331,36 @@ func getUnslothVramUsed(pids []int) int {
 		}
 	}
 	return totalUsed
+}
+
+func getActiveModel() string {
+	client := &http.Client{Timeout: 2 * time.Second}
+	req, err := http.NewRequest("GET", "http://127.0.0.1:8888/v1/models", nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("Authorization", "Bearer REDACTED_UNSLOTH_API_KEY")
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	
+	type ModelItem struct {
+		ID string `json:"id"`
+	}
+	type ModelList struct {
+		Data []ModelItem `json:"data"`
+	}
+	var list ModelList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return ""
+	}
+	if len(list.Data) > 0 {
+		return list.Data[0].ID
+	}
+	return ""
 }

@@ -145,6 +145,30 @@ type Alert struct {
 	Message string `json:"message"`
 }
 
+type WinDiskInfo struct {
+	DeviceID  string `json:"DeviceID"`
+	Size      int64  `json:"Size"`
+	FreeSpace int64  `json:"FreeSpace"`
+}
+
+type WinProcessInfo struct {
+	ID          int      `json:"Id"`
+	ProcessName string   `json:"ProcessName"`
+	CPU         *float64 `json:"CPU"`
+	WorkingSet  int64    `json:"WorkingSet64"`
+}
+
+type JumpHostStatus struct {
+	CPUUtilPct   int              `json:"cpu_util_pct"`
+	MemTotalKB   int64            `json:"mem_total_kb"`
+	MemFreeKB    int64            `json:"mem_free_kb"`
+	OSName       string           `json:"os_name"`
+	LastBootTime string           `json:"last_boot_time"`
+	Disks        []WinDiskInfo    `json:"disks"`
+	Processes    []WinProcessInfo `json:"processes"`
+	Users        string           `json:"users"`
+}
+
 type app struct {
 	configPath  string
 	staticDir   string
@@ -195,6 +219,10 @@ func main() {
 	mux.HandleFunc("/api/unsloth/status", api.handleUnslothStatus)
 	mux.HandleFunc("/api/unsloth/control", api.handleUnslothControl)
 	mux.HandleFunc("/api/unsloth/models", api.handleUnslothModels)
+	mux.HandleFunc("/api/jump-host/status", api.handleJumpHostStatus)
+	mux.HandleFunc("/api/palworld/settings", api.handlePalworldSettings)
+	mux.HandleFunc("/api/palworld/settings/save", api.handlePalworldSettingsSave)
+	mux.HandleFunc("/api/palworld/control", api.handlePalworldControl)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok\n")) })
 	mux.HandleFunc("/", api.handleStatic)
 
@@ -1015,4 +1043,186 @@ func (a *app) handleUnslothModels(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
 	_, _ = io.Copy(w, resp.Body)
+}
+
+func (a *app) handleJumpHostStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	psCmd := `$cpu = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average; $os = Get-CimInstance Win32_OperatingSystem | Select-Object Caption, TotalVisibleMemorySize, FreePhysicalMemory, LastBootUpTime; $disks = Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Select-Object DeviceID, Size, FreeSpace; $processes = Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 25 | Select-Object Id, ProcessName, CPU, WorkingSet64; $users = if (Get-Command quser -ErrorAction SilentlyContinue) { quser 2>&1 | Out-String } else { (Get-CimInstance Win32_ComputerSystem).UserName }; $result = @{ cpu_util_pct = [int]$cpu; mem_total_kb = $os.TotalVisibleMemorySize; mem_free_kb = $os.FreePhysicalMemory; os_name = $os.Caption; last_boot_time = $os.LastBootUpTime.ToString('yyyy-MM-dd HH:mm:ss'); disks = $disks; processes = $processes; users = $users }; $result | ConvertTo-Json -Compress`
+	
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-Command", psCmd)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("powershell error: %v, output: %s", err, string(output)), http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(output)
+}
+
+func (a *app) handlePalworldSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	filePath := `C:\Users\James\tools\palserver\Pal\Saved\Config\WindowsServer\PalWorldSettings.ini`
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		// Fallback to default
+		filePath = `C:\Users\James\tools\palserver\DefaultPalWorldSettings.ini`
+		data, err = os.ReadFile(filePath)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	content := string(data)
+	start := strings.Index(content, "OptionSettings=(")
+	if start == -1 {
+		http.Error(w, "invalid config format: OptionSettings not found", http.StatusInternalServerError)
+		return
+	}
+	start += len("OptionSettings=(")
+	end := strings.LastIndex(content, ")")
+	if end == -1 || end < start {
+		http.Error(w, "invalid config format: matching parenthesis not found", http.StatusInternalServerError)
+		return
+	}
+	optionsStr := content[start:end]
+	settings := parsePalworldOptions(optionsStr)
+	writeJSON(w, settings)
+}
+
+func parsePalworldOptions(s string) map[string]string {
+	m := make(map[string]string)
+	var key, val strings.Builder
+	inQuotes := false
+	inParens := 0
+	isKey := true
+	
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if ch == '"' {
+			inQuotes = !inQuotes
+			val.WriteByte(ch)
+		} else if ch == '(' && !inQuotes {
+			inParens++
+			val.WriteByte(ch)
+		} else if ch == ')' && !inQuotes {
+			inParens--
+			val.WriteByte(ch)
+		} else if ch == '=' && !inQuotes && inParens == 0 && isKey {
+			isKey = false
+		} else if ch == ',' && !inQuotes && inParens == 0 {
+			k := strings.TrimSpace(key.String())
+			v := strings.TrimSpace(val.String())
+			if k != "" {
+				m[k] = v
+			}
+			key.Reset()
+			val.Reset()
+			isKey = true
+		} else {
+			if isKey {
+				key.WriteByte(ch)
+			} else {
+				val.WriteByte(ch)
+			}
+		}
+	}
+	k := strings.TrimSpace(key.String())
+	v := strings.TrimSpace(val.String())
+	if k != "" {
+		m[k] = v
+	}
+	return m
+}
+
+func (a *app) handlePalworldSettingsSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var newSettings map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&newSettings); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	filePath := `C:\Users\James\tools\palserver\Pal\Saved\Config\WindowsServer\PalWorldSettings.ini`
+	data, err := os.ReadFile(filePath)
+	var originalKeys []string
+	if err == nil {
+		content := string(data)
+		start := strings.Index(content, "OptionSettings=(")
+		if start != -1 {
+			start += len("OptionSettings=(")
+			end := strings.LastIndex(content, ")")
+			if end != -1 && end > start {
+				origMap := parsePalworldOptions(content[start:end])
+				for k := range origMap {
+					originalKeys = append(originalKeys, k)
+				}
+				sort.Strings(originalKeys)
+			}
+		}
+	}
+	
+	if len(originalKeys) == 0 {
+		for k := range newSettings {
+			originalKeys = append(originalKeys, k)
+		}
+		sort.Strings(originalKeys)
+	}
+	
+	var parts []string
+	for _, k := range originalKeys {
+		if v, ok := newSettings[k]; ok {
+			parts = append(parts, fmt.Sprintf("%s=%s", k, v))
+		}
+	}
+	
+	output := fmt.Sprintf("[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(%s)\n", strings.Join(parts, ","))
+	
+	err = os.WriteFile(filePath, []byte(output), 0644)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	_, _ = w.Write([]byte("ok\n"))
+}
+
+func (a *app) handlePalworldControl(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	action := r.URL.Query().Get("action")
+	if action == "restart" {
+		// Stop PalServer
+		_ = exec.Command("taskkill", "/F", "/IM", "PalServer-Win64-Shipping-Cmd.exe").Run()
+		_ = exec.Command("taskkill", "/F", "/IM", "PalServer.exe").Run()
+		
+		time.Sleep(2 * time.Second)
+		
+		// Start PalServer
+		cmd := exec.Command("C:\\Users\\James\\tools\\palserver\\PalServer.exe")
+		cmd.Dir = "C:\\Users\\James\\tools\\palserver"
+		err := cmd.Start()
+		if err != nil {
+			http.Error(w, fmt.Sprintf("start error: %v", err), http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write([]byte("restarted\n"))
+		return
+	}
+	http.Error(w, "invalid action", http.StatusBadRequest)
 }

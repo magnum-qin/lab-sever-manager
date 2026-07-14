@@ -356,6 +356,7 @@ interface UnslothStatus {
   running: boolean;
   vram_used_mb: number;
   timeout_minutes: number;
+  active_model?: string;
 }
 
 function UnslothManagerCard({ host }: { host: any }) {
@@ -529,43 +530,29 @@ function UnslothManagerCard({ host }: { host: any }) {
         
         
 
-        {/* Memory Allocation */}
+        {/* Running Model */}
         <div className="flex flex-col border-b border-slate-100 py-3 first:pt-0">
           <div className="flex justify-between items-center gap-2 font-semibold text-slate-700 text-sm mb-2">
             <span className="text-xs text-slate-600 flex items-center gap-1.5 min-w-0">
               <Database size={13} className="text-slate-400" />
-              Memory Allocation
+              Running Model
             </span>
-            {status.running && status.vram_used_mb > 2000 && (
+            {status.running && (status.active_model || status.vram_used_mb > 2000) && (
               <button onClick={() => handleAction('unload')} className="text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-0.5 rounded transition-colors shadow-sm">
                 Unload Model
               </button>
             )}
           </div>
           
-          <div className="mb-1 p-3 bg-slate-50 border border-slate-100 rounded-xl">
-            <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-indigo-600 font-bold">VRAM</span>
-                <span className="text-slate-400 font-normal">Usage</span>
-              </div>
-              <span className="font-mono font-bold text-slate-800">
-                {status.running && status.vram_used_mb > 2000 
-                  ? `${Math.round((status.vram_used_mb / Math.max(1, totalVramMb)) * 100)}% ` 
-                  : '0% '}
-                <span className="text-slate-400 font-normal">
-                  ({status.running && status.vram_used_mb > 2000 ? Math.round(status.vram_used_mb/1024) : 0} GB / {Math.round(totalVramMb/1024)} GB)
-                </span>
-              </span>
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${
-                  (status.vram_used_mb / Math.max(1, totalVramMb)) >= 0.9 ? 'bg-rose-500' : (status.vram_used_mb / Math.max(1, totalVramMb)) >= 0.75 ? 'bg-amber-500' : 'bg-indigo-600'
-                }`}
-                style={{ width: `${status.running && status.vram_used_mb > 0 ? Math.min(100, (status.vram_used_mb / Math.max(1, totalVramMb)) * 100) : 0}%` }}
-              />
-            </div>
+          <div className="mb-1 p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between gap-2 min-w-0">
+            <span className="font-mono text-xs font-semibold text-slate-800 truncate" title={
+              !status.running ? 'Stopped' : (status.active_model || (status.vram_used_mb > 2000 ? 'Loaded Model' : 'No model loaded'))
+            }>
+              {!status.running ? 'Stopped' : (status.active_model || (status.vram_used_mb > 2000 ? 'Loaded Model' : 'No model loaded'))}
+            </span>
+            {status.running && (status.active_model || status.vram_used_mb > 2000) && (
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+            )}
           </div>
         </div>
 

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Gauge, RefreshCw, Server, Search, Play, Pause, Network } from 'lucide-react';
+import { AlertTriangle, Gauge, RefreshCw, Server, Search, Play, Pause, Network, Laptop } from 'lucide-react';
 import { HostCardsGrid, HostDetailsView, HostWarningDetailsView, AttentionNeededWorkspace } from './components/HostTable';
 import { Card } from './components/Primitives';
 import { cpuPct, rowSignature } from './metrics';
 import type { StatusResponse } from './types';
+import JumpHostDashboard from './components/JumpHostDashboard';
 import './styles.css';
 
 function App() {
@@ -21,7 +22,7 @@ function App() {
   const [sortBy, setSortBy] = useState<'name' | 'cpu' | 'gpu' | 'vram'>('name');
   const [isPaused, setIsPaused] = useState(false);
   const [pollInterval, setPollInterval] = useState(2);
-  const [activeTab, setActiveTab] = useState<'all' | 'a6000' | 'rtx4090' | 'attention' | 'port-mappings'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'a6000' | 'rtx4090' | 'attention' | 'port-mappings' | 'jump-host'>('all');
 
   useEffect(() => {
     if (isPaused) return;
@@ -150,11 +151,10 @@ function App() {
           {/* Brand/Workspace Selector card */}
           <div className="flex items-center gap-3 px-2.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50">
             <div className="h-9 w-9 flex items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-sm shadow-[0_2px_8px_rgba(79,70,229,0.25)] shrink-0">
-              GP
+              SL
             </div>
             <div className="min-w-0">
-              <span className="font-bold text-slate-800 text-sm block leading-tight truncate">GPU Lab Ops</span>
-              <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">Administrator</span>
+              <span className="font-bold text-slate-800 text-sm block leading-tight truncate">Suzuki lab sever</span>
             </div>
           </div>
 
@@ -185,10 +185,10 @@ function App() {
               onClick={() => setActiveTab('rtx4090')}
             />
             <SidebarItem
-              icon={<Network size={16} />}
-              label="Port Mappings"
-              active={activeTab === 'port-mappings'}
-              onClick={() => setActiveTab('port-mappings')}
+              icon={<Laptop size={16} />}
+              label="Jump Host"
+              active={activeTab === 'jump-host'}
+              onClick={() => setActiveTab('jump-host')}
               hideCount={true}
             />
             <SidebarItem
@@ -202,25 +202,15 @@ function App() {
           </div>
         </div>
 
-        {/* Profile Card at Bottom */}
-        <div className="flex items-center gap-3 border-t border-slate-100 pt-4 px-2">
-          <div className="h-9 w-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
-            JA
-          </div>
-          <div className="min-w-0">
-            <span className="font-bold text-slate-800 text-xs block leading-tight truncate">James Admin</span>
-            <span className="text-[9px] text-slate-400 font-medium block mt-0.5">ts-win-jump</span>
-          </div>
-        </div>
       </aside>
 
       {/* Mobile Top Navbar */}
       <header className="md:hidden sticky top-0 z-40 bg-white border-b border-slate-200 w-full h-16 px-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-xs">
-            GP
+            SL
           </div>
-          <span className="font-bold text-slate-800 text-sm">GPU Lab Ops</span>
+          <span className="font-bold text-slate-800 text-sm">Suzuki lab sever</span>
         </div>
         <div className="flex gap-1.5">
           <button
@@ -230,6 +220,14 @@ function App() {
             }`}
           >
             All ({hostsCounts.all})
+          </button>
+          <button
+            onClick={() => setActiveTab('jump-host')}
+            className={`p-2 rounded-lg border text-xs font-semibold ${
+              activeTab === 'jump-host' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-500'
+            }`}
+          >
+            Jump Host
           </button>
           <button
             onClick={() => setActiveTab('attention')}
@@ -242,10 +240,13 @@ function App() {
         </div>
       </header>
 
-      {/* Main Workspace */}
       <main className="flex-1 min-w-0 p-6 md:p-8 max-w-7xl mx-auto w-full flex flex-col gap-6">
-        {/* Toolbar: Search, Filter, Sort, Refresh Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        {activeTab === 'jump-host' ? (
+          <JumpHostDashboard clusterHosts={status?.hosts.map(h => ({ name: h.name, ip: h.ip })) ?? []} />
+        ) : (
+          <>
+            {/* Toolbar: Search, Filter, Sort, Refresh Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
           {/* Left: Search & Filter & Sort */}
           <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
             {/* Search Input */}
@@ -327,14 +328,7 @@ function App() {
           </div>
         </div>
 
-        {activeTab === 'port-mappings' ? (
-          <div className="space-y-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
-              TCP Port Forwarding Mappings
-            </h3>
-            <PortMappingsView hosts={status?.hosts.map(h => ({ name: h.name, ip: h.ip })) ?? []} />
-          </div>
-        ) : activeTab === 'attention' ? (
+        {activeTab === 'attention' ? (
           <AttentionNeededWorkspace
             hosts={filteredHosts}
             selectedHost={selectedHost}
@@ -386,6 +380,8 @@ function App() {
             )}
           </>
         )}
+          </>
+        )}
       </main>
     </div>
   );
@@ -428,239 +424,6 @@ function SidebarItem({ icon, label, active, count = 0, onClick, isWarning = fals
         </span>
       )}
     </button>
-  );
-}
-
-type PortProxyMapping = {
-  listen_address: string;
-  listen_port: number;
-  connect_address: string;
-  connect_port: number;
-};
-
-function PortMappingsView({ hosts }: { hosts: { name: string; ip: string }[] }) {
-  const [mappings, setMappings] = useState<PortProxyMapping[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Form states
-  const [listenAddress, setListenAddress] = useState('100.99.99.99');
-  const [listenPort, setListenPort] = useState('');
-  const [connectAddress, setConnectAddress] = useState('');
-  const [connectPort, setConnectPort] = useState('11433');
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Initialize connectAddress to the first host's IP
-  useEffect(() => {
-    if (hosts.length > 0 && !connectAddress) {
-      setConnectAddress(hosts[0].ip);
-    }
-  }, [hosts, connectAddress]);
-
-  const loadMappings = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/portproxy');
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      const data = await res.json() as PortProxyMapping[];
-      setMappings(data || []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadMappings();
-  }, []);
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!listenPort || !connectAddress || !connectPort) {
-      setSubmitError("Please fill in all fields.");
-      return;
-    }
-    setSubmitError(null);
-    setIsSubmitting(true);
-    try {
-      const res = await fetch('/api/portproxy/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listen_address: listenAddress,
-          listen_port: Number(listenPort),
-          connect_address: connectAddress,
-          connect_port: Number(connectPort)
-        })
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `${res.status} ${res.statusText}`);
-      }
-      setListenPort('');
-      setSubmitError(null);
-      loadMappings();
-    } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (listenAddress: string, listenPort: number) => {
-    if (!window.confirm(`Are you sure you want to delete mapping on port ${listenPort}?`)) return;
-    try {
-      const res = await fetch('/api/portproxy/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listen_address: listenAddress,
-          listen_port: listenPort
-        })
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `${res.status} ${res.statusText}`);
-      }
-      loadMappings();
-    } catch (e) {
-      alert(`Delete failed: ${e instanceof Error ? e.message : e}`);
-    }
-  };
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* List Card */}
-      <section className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col min-h-[350px]">
-        <div className="mb-4">
-          <h3 className="text-sm font-bold text-slate-800">Active Port Mappings</h3>
-          <p className="text-xs text-slate-400 mt-0.5">Windows netsh TCP ipv4 interface portproxy rules.</p>
-        </div>
-
-        {loading ? (
-          <div className="flex-1 flex items-center justify-center py-10">
-            <span className="text-xs text-slate-400">Loading port proxy list...</span>
-          </div>
-        ) : error ? (
-          <div className="flex-1 flex items-center justify-center py-10 text-rose-500 text-xs font-semibold">
-            Error: {error}
-          </div>
-        ) : mappings.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center py-10 text-slate-400 text-xs italic">
-            No active port mappings configured.
-          </div>
-        ) : (
-          <div className="overflow-x-auto w-full flex-1 min-h-0">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="text-slate-400 font-bold border-b border-slate-200/50 font-sans">
-                  <th className="pb-2 font-semibold">Listen IP</th>
-                  <th className="pb-2 font-semibold">Listen Port</th>
-                  <th className="pb-2 font-semibold">Target Node IP</th>
-                  <th className="pb-2 font-semibold">Target Port</th>
-                  <th className="pb-2 font-semibold text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-mono">
-                {mappings.map((m, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50">
-                    <td className="py-2.5 text-slate-650">{m.listen_address}</td>
-                    <td className="py-2.5 text-slate-800 font-bold">{m.listen_port}</td>
-                    <td className="py-2.5 text-slate-650">{m.connect_address}</td>
-                    <td className="py-2.5 text-slate-600">{m.connect_port}</td>
-                    <td className="py-2.5 text-right">
-                      <button
-                        onClick={() => handleDelete(m.listen_address, m.listen_port)}
-                        className="text-[10px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* Add Mapping Card */}
-      <section className="lg:col-span-1 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4">
-          <h3 className="text-sm font-bold text-slate-800">Add Port Proxy</h3>
-          <p className="text-xs text-slate-400 mt-0.5">Register a new network mapping.</p>
-        </div>
-
-        <form onSubmit={handleAdd} className="space-y-4 text-xs">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Listen IP</label>
-            <input
-              type="text"
-              value={listenAddress}
-              onChange={(e) => setListenAddress(e.target.value)}
-              className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-              placeholder="e.g. 100.99.99.99 or 0.0.0.0"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Listen Port</label>
-            <input
-              type="number"
-              value={listenPort}
-              onChange={(e) => setListenPort(e.target.value)}
-              className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-bold"
-              placeholder="e.g. 11449"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Target Node</label>
-            <select
-              value={connectAddress}
-              onChange={(e) => setConnectAddress(e.target.value)}
-              className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-            >
-              {hosts.map((h) => (
-                <option key={h.ip} value={h.ip}>
-                  {h.name} ({h.ip})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Target Port</label>
-            <input
-              type="number"
-              value={connectPort}
-              onChange={(e) => setConnectPort(e.target.value)}
-              className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-              placeholder="11433"
-              required
-            />
-          </div>
-
-          {submitError && (
-            <div className="text-rose-500 text-[10px] font-semibold bg-rose-50 border border-rose-100 p-2 rounded">
-              {submitError}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition disabled:opacity-50 cursor-pointer"
-          >
-            {isSubmitting ? "Creating..." : "Add Mapping"}
-          </button>
-        </form>
-      </section>
-    </div>
   );
 }
 
