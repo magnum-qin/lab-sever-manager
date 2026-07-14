@@ -3,7 +3,7 @@ import { Card, ProgressMetric } from './Primitives';
 import { 
   Laptop, Cpu, HardDrive, Clock, RefreshCw, Activity, Terminal, 
   Globe, Folder, Gamepad2, MessageSquare, Code, Database, BarChart3, Settings,
-  Plus, Trash2, X, Power
+  Plus, Trash2, Edit, X, Power
 } from 'lucide-react';
 
 interface WinDiskInfo {
@@ -123,6 +123,7 @@ export default function JumpHostDashboard({ clusterHosts }: JumpHostDashboardPro
   const [mappingsLoading, setMappingsLoading] = useState(false);
   const [mappingsError, setMappingsError] = useState<string | null>(null);
   const [isAddMappingOpen, setIsAddMappingOpen] = useState(false);
+  const [editingMapping, setEditingMapping] = useState<PortProxyMapping | null>(null);
 
   const fetchStatus = async () => {
     try {
@@ -191,7 +192,7 @@ export default function JumpHostDashboard({ clusterHosts }: JumpHostDashboardPro
     return (
       <div className="flex-1 flex flex-col items-center justify-center py-20">
         <RefreshCw className="animate-spin text-indigo-650 mb-4" size={32} />
-        <span className="text-sm font-semibold text-slate-450">Connecting to Jump Host...</span>
+        <span className="text-sm font-semibold text-slate-455">Connecting to Jump Host...</span>
       </div>
     );
   }
@@ -450,7 +451,7 @@ export default function JumpHostDashboard({ clusterHosts }: JumpHostDashboardPro
                   <tr className="bg-slate-50/50 border-y border-slate-100 font-bold text-slate-400">
                     <th className="py-2 px-5">Port</th>
                     <th className="py-2 px-3">Target Node (IP)</th>
-                    <th className="py-2 px-5 text-right">Delete</th>
+                    <th className="py-2 px-5 text-right w-20">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-mono text-slate-700">
@@ -460,16 +461,26 @@ export default function JumpHostDashboard({ clusterHosts }: JumpHostDashboardPro
                     return (
                       <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
                         <td className="py-2 px-5 font-bold text-slate-800">{m.listen_port}</td>
-                        <td className="py-2 px-3 text-slate-600 truncate max-w-[130px]" title={`${label}:${m.connect_port}`}>
+                        <td className="py-2 px-3 text-slate-600 truncate max-w-[110px]" title={`${label}:${m.connect_port}`}>
                           {label} <span className="text-[9px] text-slate-400">({m.connect_port})</span>
                         </td>
                         <td className="py-2 px-5 text-right font-sans">
-                          <button
-                            onClick={() => handleDeleteMapping(m.listen_address, m.listen_port)}
-                            className="text-rose-600 hover:text-rose-800 cursor-pointer border-0 bg-transparent"
-                          >
-                            <Trash2 size={12} className="inline" />
-                          </button>
+                          <div className="flex items-center justify-end gap-2.5">
+                            <button
+                              onClick={() => setEditingMapping(m)}
+                              className="text-slate-400 hover:text-indigo-600 cursor-pointer border-0 bg-transparent p-0 flex items-center"
+                              title="Edit Mapping"
+                            >
+                              <Edit size={12} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMapping(m.listen_address, m.listen_port)}
+                              className="text-rose-650 hover:text-rose-800 cursor-pointer border-0 bg-transparent p-0 flex items-center"
+                              title="Delete Mapping"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -492,6 +503,16 @@ export default function JumpHostDashboard({ clusterHosts }: JumpHostDashboardPro
           clusterHosts={clusterHosts} 
           onClose={() => setIsAddMappingOpen(false)} 
           onAddComplete={() => { loadMappings(); setIsAddMappingOpen(false); }} 
+        />
+      )}
+
+      {/* Edit Port Mapping Modal */}
+      {editingMapping && (
+        <EditPortMappingModal
+          clusterHosts={clusterHosts}
+          mapping={editingMapping}
+          onClose={() => setEditingMapping(null)}
+          onEditComplete={() => { loadMappings(); setEditingMapping(null); }}
         />
       )}
     </div>
@@ -586,7 +607,7 @@ function AddPortMappingModal({ clusterHosts, onClose, onAddComplete }: AddPortMa
               type="number"
               value={listenPort}
               onChange={(e) => setListenPort(e.target.value)}
-              className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-bold text-slate-805"
+              className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-bold text-slate-800"
               placeholder="e.g. 11449"
               required
             />
@@ -640,6 +661,176 @@ function AddPortMappingModal({ clusterHosts, onClose, onAddComplete }: AddPortMa
               className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1 border-0"
             >
               {submitting ? "Adding..." : "Add Rule"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// Helper Component: Edit Port Mapping Modal
+// -------------------------------------------------------------
+interface EditPortMappingModalProps {
+  clusterHosts: { name: string; ip: string }[];
+  mapping: PortProxyMapping;
+  onClose: () => void;
+  onEditComplete: () => void;
+}
+
+function EditPortMappingModal({ clusterHosts, mapping, onClose, onEditComplete }: EditPortMappingModalProps) {
+  const [listenAddress, setListenAddress] = useState(mapping.listen_address);
+  const [listenPort, setListenPort] = useState(mapping.listen_port.toString());
+  const [connectAddress, setConnectAddress] = useState(mapping.connect_address);
+  const [connectPort, setConnectPort] = useState(mapping.connect_port.toString());
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!listenPort || !connectAddress || !connectPort) {
+      setError("Please fill in all fields.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      // 1. Delete old mapping rule first
+      const delRes = await fetch('/api/portproxy/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listen_address: mapping.listen_address,
+          listen_port: mapping.listen_port
+        })
+      });
+      if (!delRes.ok) {
+        throw new Error(`Failed to remove old rule: ${await delRes.text()}`);
+      }
+
+      // 2. Add new mapping rule
+      const addRes = await fetch('/api/portproxy/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listen_address: listenAddress,
+          listen_port: Number(listenPort),
+          connect_address: connectAddress,
+          connect_port: Number(connectPort)
+        })
+      });
+      if (!addRes.ok) {
+        // If adding new rule fails, try to restore the old one
+        await fetch('/api/portproxy/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            listen_address: mapping.listen_address,
+            listen_port: mapping.listen_port,
+            connect_address: mapping.connect_address,
+            connect_port: mapping.connect_port
+          })
+        });
+        throw new Error(`Failed to create new rule: ${await addRes.text()}`);
+      }
+
+      onEditComplete();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl border border-slate-200 w-full max-w-sm flex flex-col shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-200 p-5 shrink-0 bg-slate-50/50">
+          <div className="flex items-center gap-2">
+            <Edit className="text-indigo-650" size={18} />
+            <h3 className="font-bold text-slate-800 text-sm">Edit Port Mapping</h3>
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-650 rounded-lg hover:bg-slate-200/50 transition cursor-pointer border-0 bg-transparent">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body content */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Listen IP</label>
+            <input
+              type="text"
+              value={listenAddress}
+              onChange={(e) => setListenAddress(e.target.value)}
+              className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-slate-700"
+              placeholder="e.g. 100.99.99.99"
+              required
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Listen Port</label>
+            <input
+              type="number"
+              value={listenPort}
+              onChange={(e) => setListenPort(e.target.value)}
+              className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-bold text-slate-800"
+              placeholder="e.g. 11449"
+              required
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Target Node</label>
+            <select
+              value={connectAddress}
+              onChange={(e) => setConnectAddress(e.target.value)}
+              className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-sans font-semibold text-slate-700 bg-slate-50 cursor-pointer"
+            >
+              {clusterHosts.map((h) => (
+                <option key={h.ip} value={h.ip}>
+                  {h.name} ({h.ip})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Target Port</label>
+            <input
+              type="number"
+              value={connectPort}
+              onChange={(e) => setConnectPort(e.target.value)}
+              className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-slate-750"
+              placeholder="11433"
+              required
+            />
+          </div>
+
+          {error && (
+            <div className="text-rose-500 text-[10px] font-semibold bg-rose-50 border border-rose-100 p-2 rounded">
+              {error}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 py-2 border border-slate-200 text-slate-650 hover:bg-slate-100 rounded-lg font-bold transition disabled:opacity-50 cursor-pointer bg-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1 border-0"
+            >
+              {submitting ? "Saving..." : "Save Changes"}
             </button>
           </div>
         </form>
@@ -728,7 +919,7 @@ function PalworldSettingsModal({ onClose, onRestartComplete }: PalworldSettingsM
             <Gamepad2 className="text-indigo-650" size={20} />
             <h3 className="font-bold text-slate-800 text-sm">Palworld Game Server Settings</h3>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-450 hover:text-slate-650 rounded-lg hover:bg-slate-200/50 transition cursor-pointer border-0 bg-transparent">
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-650 rounded-lg hover:bg-slate-200/50 transition cursor-pointer border-0 bg-transparent">
             <X size={18} />
           </button>
         </div>
@@ -753,7 +944,7 @@ function PalworldSettingsModal({ onClose, onRestartComplete }: PalworldSettingsM
                   <h4 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider border-b border-slate-100 pb-1.5">Server Profile</h4>
                   
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Server Name</label>
+                    <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Server Name</label>
                     <input
                       type="text"
                       value={getVal('ServerName')}
