@@ -942,23 +942,24 @@ function PalworldSettingsModal({ onClose, onRestartComplete }: PalworldSettingsM
           ) : (
             <div className="space-y-6">
               {/* Settings Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
                 {/* Server info group */}
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider border-b border-slate-100 pb-1.5">Server Profile</h4>
+                  <h4 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider border-b border-slate-100 pb-1.5">Server Profile / 服务器档案</h4>
                   
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Server Name</label>
+                    <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Server Name (服务器名称)</label>
                     <input
                       type="text"
                       value={getVal('ServerName')}
                       onChange={e => setVal('ServerName', e.target.value, true)}
                       className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-sans font-semibold text-slate-700"
                     />
+                    <span className="block text-[9px] text-slate-400 leading-normal">游戏大厅联机列表中所显示的服务器名称标题。</span>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Server Password</label>
+                    <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Server Password (服务器密码)</label>
                     <input
                       type="text"
                       value={getVal('ServerPassword')}
@@ -966,61 +967,66 @@ function PalworldSettingsModal({ onClose, onRestartComplete }: PalworldSettingsM
                       className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                       placeholder="No password"
                     />
+                    <span className="block text-[9px] text-slate-400 leading-normal">进入服务器时需要输入的安全进入密码，为空则任何人可连。</span>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Admin Password</label>
+                    <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Admin Password (管理员密码)</label>
                     <input
                       type="text"
                       value={getVal('AdminPassword')}
                       onChange={e => setVal('AdminPassword', e.target.value, true)}
                       className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                     />
+                    <span className="block text-[9px] text-slate-400 leading-normal">获取游戏内管理员身份（/AdminPassword &lt;密码&gt;）的超级管理密码。</span>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Server Description</label>
+                    <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Server Description (服务器描述)</label>
                     <textarea
                       value={getVal('ServerDescription')}
                       onChange={e => setVal('ServerDescription', e.target.value, true)}
                       rows={2}
                       className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-sans font-medium text-slate-700"
                     />
+                    <span className="block text-[9px] text-slate-400 leading-normal">展示在服务器列表详情面板中的背景描述文字。</span>
                   </div>
                 </div>
 
                 {/* Game rule group */}
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider border-b border-slate-100 pb-1.5">Game Rules</h4>
+                  <h4 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider border-b border-slate-100 pb-1.5">Game Rules / 游戏规则</h4>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Difficulty</label>
+                      <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Difficulty (难度)</label>
                       <select
                         value={getVal('Difficulty', 'None')}
                         onChange={e => setVal('Difficulty', e.target.value)}
                         className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-sans font-semibold text-slate-700 bg-slate-50 cursor-pointer"
                       >
-                        <option value="None">None</option>
-                        <option value="Normal">Normal</option>
-                        <option value="Hard">Hard</option>
+                        <option value="None">None (无)</option>
+                        <option value="Normal">Normal (普通)</option>
+                        <option value="Hard">Hard (困难)</option>
                       </select>
+                      <span className="block text-[9px] text-slate-400 leading-normal">服务器环境整体难度。</span>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Max Players</label>
+                      <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Max Players (最大玩家)</label>
                       <input
                         type="number"
                         value={getVal('ServerPlayerMaxNum', '32')}
                         onChange={e => setVal('ServerPlayerMaxNum', e.target.value)}
                         className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-bold text-slate-700"
                       />
+                      <span className="block text-[9px] text-slate-400 leading-normal">最高在线玩家数限制。</span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">EXP Rate</label>
+                      <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">EXP Rate (经验值倍率)</label>
                       <input
                         type="number"
                         step="0.1"
@@ -1028,10 +1034,11 @@ function PalworldSettingsModal({ onClose, onRestartComplete }: PalworldSettingsM
                         onChange={e => setVal('ExpRate', e.target.value)}
                         className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-semibold"
                       />
+                      <span className="block text-[9px] text-slate-400 leading-normal">获取经验的结算增幅倍数。</span>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Pal Egg Hatch Hours</label>
+                      <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Pal Egg Hatch (孵蛋时间)</label>
                       <input
                         type="number"
                         step="0.1"
@@ -1039,22 +1046,24 @@ function PalworldSettingsModal({ onClose, onRestartComplete }: PalworldSettingsM
                         onChange={e => setVal('PalEggDefaultHatchingTime', e.target.value)}
                         className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-semibold"
                       />
+                      <span className="block text-[9px] text-slate-400 leading-normal">巨蛋孵化所需的物理小时。</span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Max Workers/Base</label>
+                      <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Workers/Base (工作数)</label>
                       <input
                         type="number"
                         value={getVal('BaseCampWorkerMaxNum', '15')}
                         onChange={e => setVal('BaseCampWorkerMaxNum', e.target.value)}
                         className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-semibold"
                       />
+                      <span className="block text-[9px] text-slate-400 leading-normal">据点终端工作的帕鲁最大数。</span>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Pal Spawn Rate</label>
+                      <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Pal Spawn Rate (生成倍率)</label>
                       <input
                         type="number"
                         step="0.1"
@@ -1062,21 +1071,23 @@ function PalworldSettingsModal({ onClose, onRestartComplete }: PalworldSettingsM
                         onChange={e => setVal('PalSpawnNumRate', e.target.value)}
                         className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-semibold"
                       />
+                      <span className="block text-[9px] text-slate-400 leading-normal">野生帕鲁刷怪倍率与密度。</span>
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Death Penalty</label>
+                    <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Death Penalty (死亡惩罚)</label>
                     <select
                       value={getVal('DeathPenalty', 'Item')}
                       onChange={e => setVal('DeathPenalty', e.target.value)}
                       className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-sans font-semibold text-slate-700 bg-slate-50 cursor-pointer"
                     >
-                      <option value="None">None (Keep everything)</option>
-                      <option value="Item">Item (Drop inventory only)</option>
-                      <option value="ItemAndEquipment">ItemAndEquipment (Drop inventory & gear)</option>
-                      <option value="All">All (Drop inventory, gear, and pals)</option>
+                      <option value="None">None (不掉落任何物品)</option>
+                      <option value="Item">Item (仅掉落背包道具，保留装备与帕鲁)</option>
+                      <option value="ItemAndEquipment">ItemAndEquipment (掉落道具与装备，保留帕鲁)</option>
+                      <option value="All">All (全部掉落：道具、装备以及身上帕鲁全部留地)</option>
                     </select>
+                    <span className="block text-[9px] text-slate-400 leading-normal">玩家角色意外死亡时的掉落惩罚规则。</span>
                   </div>
                 </div>
               </div>
@@ -1087,7 +1098,7 @@ function PalworldSettingsModal({ onClose, onRestartComplete }: PalworldSettingsM
         {/* Footer */}
         <div className="border-t border-slate-200 p-5 shrink-0 bg-slate-50 flex items-center justify-between">
           <div className="text-[10px] text-slate-400 font-medium max-w-[50%] leading-normal">
-            * Saving settings will perform an immediate restart of the Palworld server.
+            * 提示：保存设置将自动重启帕鲁服务器进程，这会导致在线玩家短暂断线。
           </div>
           <div className="flex gap-3">
             <button
@@ -1095,7 +1106,7 @@ function PalworldSettingsModal({ onClose, onRestartComplete }: PalworldSettingsM
               disabled={saving}
               className="px-4 py-2 border border-slate-200 text-slate-650 hover:bg-slate-100 rounded-lg font-bold transition disabled:opacity-50 cursor-pointer bg-white"
             >
-              Cancel
+              取消
             </button>
             <button
               onClick={handleSaveAndRestart}
@@ -1105,12 +1116,12 @@ function PalworldSettingsModal({ onClose, onRestartComplete }: PalworldSettingsM
               {saving ? (
                 <>
                   <RefreshCw className="animate-spin" size={14} />
-                  Saving & Restarting...
+                  保存并重启中...
                 </>
               ) : (
                 <>
                   <Power size={14} />
-                  Save & Restart Server
+                  保存并重启服务器
                 </>
               )}
             </button>
