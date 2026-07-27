@@ -208,7 +208,15 @@ export function HostDetailsView({ host, cpuHistory, gpuHistory, pollSeconds = 2,
                   caption={`${mb(host.gpu.mem_used_mb)} / ${mb(host.gpu.mem_total_mb)}`}
                 />
               </>
-            ) : null}
+            ) : (
+              <div className="p-3 bg-amber-50/80 border border-amber-200/70 rounded-xl flex items-center justify-between text-xs text-amber-900 mt-2">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="font-bold">GPU Metrics Unavailable</span>
+                </div>
+                <span className="text-[10px] text-amber-700 font-semibold font-mono">Driver/NVML Issue</span>
+              </div>
+            )}
           </div>
         </Card>
 
