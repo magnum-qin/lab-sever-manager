@@ -31,7 +31,7 @@ Security properties:
 Operational check from the jump host:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Headers @{ 'X-Agent-Token' = '<your-token>' } http://192.168.2.143:18180/status
+Invoke-WebRequest -UseBasicParsing -Headers @{ 'X-Agent-Token' = '<your-token>' } http://10.0.0.11:18180/status
 ```
 
 

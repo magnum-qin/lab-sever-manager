@@ -1032,7 +1032,7 @@ func (a *app) handleUnslothModels(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	req.Header.Set("Authorization", "Bearer REDACTED_UNSLOTH_API_KEY")
+	req.Header.Set("Authorization", "Bearer "+os.Getenv("UNSLOTH_API_KEY"))
 	
 	resp, err := a.client.Do(req)
 	if err != nil {

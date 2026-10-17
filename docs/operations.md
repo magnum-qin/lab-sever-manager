@@ -55,14 +55,14 @@ loginctl enable-linger g24tka12
 Check the dashboard API from a Tailscale client:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing http://100.99.99.99:18080/health
-Invoke-RestMethod http://100.99.99.99:18080/api/status
+Invoke-WebRequest -UseBasicParsing http://100.64.0.1:18080/health
+Invoke-RestMethod http://100.64.0.1:18080/api/status
 ```
 
 Check one Linux agent from the jump host:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Headers @{ 'X-Agent-Token' = '<your-token>' } http://192.168.2.143:18180/status
+Invoke-WebRequest -UseBasicParsing -Headers @{ 'X-Agent-Token' = '<your-token>' } http://10.0.0.11:18180/status
 ```
 
 ## Troubleshooting

@@ -1,5 +1,5 @@
 param(
-  [string]$JumpHost = "ts-win-jump",
+  [string]$JumpHost = "windows-jump",
   [string]$LinuxUser = "g24tka12",
   [string]$RemoteDir = "/home/g24tka12/lab-server-manager",
   [string]$ConfigPath = "$PSScriptRoot\..\config\hosts.example.json",

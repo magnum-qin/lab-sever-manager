@@ -8,7 +8,7 @@ The current architecture is front/back separated:
 - **Go dashboard API**: runs on the Windows jump host at `0.0.0.0:18080`, concurrently pulls every agent with `X-Agent-Token`, normalizes probe output into JSON, and serves the frontend build.
 - **React dashboard web**: Vite + React + TypeScript frontend with a dark SaaS-style progressive dashboard, actionable attention panel, collapsible per-host details, and per-user process tables.
 
-Current lab dashboard URL: `http://100.99.99.99:18080/`
+Current lab dashboard URL: `http://100.64.0.1:18080/`
 
 ## Repository Layout
 
@@ -67,7 +67,7 @@ curl -sSL http://<JUMP-HOST-IP>:18080/agent/install_agent.sh | AGENT_TOKEN="suzu
 jump_host\start_gpu_dashboard.cmd
 ```
 
-7. Open `http://100.99.99.99:18080/` from a Tailscale client.
+7. Open `http://100.64.0.1:18080/` from a Tailscale client.
 
 ## Configuration
 
@@ -83,7 +83,7 @@ jump_host\start_gpu_dashboard.cmd
     "agent_token": "set-real-token-here"
   },
   "hosts": [
-    { "name": "a6000-143", "ip": "192.168.2.143", "group": "A6000" }
+    { "name": "gpu-node-1", "ip": "10.0.0.11", "group": "A6000" }
   ]
 }
 ```
@@ -106,14 +106,14 @@ It creates or updates the user-level scheduled task `GPUStatusDashboard` and dis
 flowchart LR
   Browser["Tailscale browser"] --> Jump["Windows jump host :18080"]
   Jump --> API["Go dashboard-api"]
-  API --> A143["a6000-143 :18180"]
-  API --> A144["a6000-144 :18180"]
-  API --> A048["a6000-048 :18180"]
-  API --> A147["a6000-147 :18180"]
-  API --> A155["a6000-155 :18180"]
-  API --> R224["rtx4090-224 :18180"]
-  API --> R56["rtx4090-56 :18180"]
-  API --> R47["rtx4090-47 :18180"]
+  API --> A143["gpu-node-1 :18180"]
+  API --> A144["gpu-node-2 :18180"]
+  API --> A048["gpu-node-1 :18180"]
+  API --> A147["gpu-node-2 :18180"]
+  API --> A155["gpu-node-3 :18180"]
+  API --> R224["gpu-node-4090 :18180"]
+  API --> R56["gpu-node-4090 :18180"]
+  API --> R47["gpu-node-4090 :18180"]
 ```
 
 ## Network & SSH Configuration
@@ -123,20 +123,20 @@ The lab network consists of a Windows jump host reachable via Tailscale, and sev
 ### Host Connection Map
 
 * **Jump Host (Windows)**:
-  * **Tailscale IP**: `100.99.99.99`
+  * **Tailscale IP**: `100.64.0.1`
   * **Windows Username**: `James`
   * **SSH Key Path**: `~/.ssh/codex_windows_tailscale_lan_ed25519`
 * **Internal GPU Servers (Linux/Ubuntu)**:
   * **Internal Username**: `g24tka12`
   * **Hosts & IPs**:
-    * `a6000-143` / `192.168.2.143` (Observed hostname: `a6000-143`)
-    * `a6000-144` / `192.168.2.151` (Observed hostname: `a6000-144`)
-    * `a6000-048` / `172.23.4.48` (Observed hostname: `a6000-048`)
-    * `a6000-147` / `172.23.4.53` (Observed hostname: `a6000-147`)
-    * `a6000-155` / `192.168.2.155` (Observed hostname: `snode204.home.arpa`)
-    * `rtx4090-224` / `192.168.2.152` (Observed hostname: `4090-224`)
-    * `rtx4090-56` / `172.23.4.56` (Observed hostname: `RTX4090-56`)
-    * `rtx4090-47` / `172.23.4.47` (Observed hostname: `node302.home.arpa`)
+    * `gpu-node-1` / `10.0.0.11` (Observed hostname: `gpu-node-1`)
+    * `gpu-node-2` / `10.0.0.12` (Observed hostname: `gpu-node-2`)
+    * `gpu-node-1` / `10.0.1.11` (Observed hostname: `gpu-node-1`)
+    * `gpu-node-2` / `10.0.1.12` (Observed hostname: `gpu-node-2`)
+    * `gpu-node-3` / `10.0.0.14` (Observed hostname: `gpu-node-3.local`)
+    * `gpu-node-4090` / `10.0.0.13` (Observed hostname: `4090-224`)
+    * `gpu-node-4090` / `10.0.1.21` (Observed hostname: `gpu-node-4090`)
+    * `gpu-node-4090` / `10.0.1.22` (Observed hostname: `gpu-node-4090.local`)
 
 ### SSH config Template
 
@@ -144,89 +144,89 @@ To configure transparent proxy jumping through the Windows jump host, add this t
 
 ```text
 # Windows Jump Host
-Host ts-win-jump
-    HostName 100.99.99.99
+Host windows-jump
+    HostName 100.64.0.1
     User James
     # IdentityFile ~/.ssh/codex_windows_tailscale_lan_ed25519
 
 # Internal Linux Hosts
-Host a6000-143
-    HostName 192.168.2.143
+Host gpu-node-1
+    HostName 10.0.0.11
     User g24tka12
-    ProxyJump ts-win-jump
+    ProxyJump windows-jump
 
-Host a6000-144
-    HostName 192.168.2.151
+Host gpu-node-2
+    HostName 10.0.0.12
     User g24tka12
-    ProxyJump ts-win-jump
+    ProxyJump windows-jump
 
-Host a6000-048
-    HostName 172.23.4.48
+Host gpu-node-1
+    HostName 10.0.1.11
     User g24tka12
-    ProxyJump ts-win-jump
+    ProxyJump windows-jump
 
-Host a6000-147
-    HostName 172.23.4.53
+Host gpu-node-2
+    HostName 10.0.1.12
     User g24tka12
-    ProxyJump ts-win-jump
+    ProxyJump windows-jump
 
-Host a6000-155
-    HostName 192.168.2.155
+Host gpu-node-3
+    HostName 10.0.0.14
     User g24tka12
-    ProxyJump ts-win-jump
+    ProxyJump windows-jump
 
-Host rtx4090-224
-    HostName 192.168.2.152
+Host gpu-node-4090
+    HostName 10.0.0.13
     User g24tka12
-    ProxyJump ts-win-jump
+    ProxyJump windows-jump
 
-Host rtx4090-56
-    HostName 172.23.4.56
+Host gpu-node-4090
+    HostName 10.0.1.23
     User g24tka12
-    ProxyJump ts-win-jump
+    ProxyJump windows-jump
 
-Host rtx4090-47
-    HostName 172.23.4.47
+Host gpu-node-4090
+    HostName 10.0.1.24
     User g24tka12
-    ProxyJump ts-win-jump
+    ProxyJump windows-jump
 ```
 
-Once configured, you can connect directly to any GPU server (e.g. `ssh a6000-143`) or run commands non-interactively using public key authentication:
+Once configured, you can connect directly to any GPU server (e.g. `ssh gpu-node-1`) or run commands non-interactively using public key authentication:
 ```powershell
-ssh -o BatchMode=yes a6000-143 "hostname && whoami && uname -a"
+ssh -o BatchMode=yes gpu-node-1 "hostname && whoami && uname -a"
 ```
 
 ### Ollama Port Forwarding Map
 
 All GPU hosts run the Ollama binary at `~/bin/ollama` listening on local/LAN port `11433`. The Windows Tailscale jump host exposes these endpoints via `netsh interface portproxy` on port range `11441-11448`:
 
-* `100.99.99.99:11441` &rarr; `a6000-143` (`192.168.2.143:11433`)
-* `100.99.99.99:11442` &rarr; `a6000-144` (`192.168.2.151:11433`)
-* `100.99.99.99:11443` &rarr; `a6000-048` (`172.23.4.48:11433`)
-* `100.99.99.99:11444` &rarr; `a6000-147` (`172.23.4.53:11433`)
-* `100.99.99.99:11445` &rarr; `a6000-155` (`192.168.2.155:11433`)
-* `100.99.99.99:11446` &rarr; `rtx4090-224` (`192.168.2.152:11433`)
-* `100.99.99.99:11447` &rarr; `rtx4090-56` (`172.23.4.56:11433`)
-* `100.99.99.99:11448` &rarr; `rtx4090-47` (`172.23.4.47:11433`)
+* `100.64.0.1:11441` &rarr; `gpu-node-1` (`10.0.0.11:11433`)
+* `100.64.0.1:11442` &rarr; `gpu-node-2` (`10.0.0.12:11433`)
+* `100.64.0.1:11443` &rarr; `gpu-node-1` (`10.0.1.11:11433`)
+* `100.64.0.1:11444` &rarr; `gpu-node-2` (`10.0.1.12:11433`)
+* `100.64.0.1:11445` &rarr; `gpu-node-3` (`10.0.0.14:11433`)
+* `100.64.0.1:11446` &rarr; `gpu-node-4090` (`10.0.0.13:11433`)
+* `100.64.0.1:11447` &rarr; `gpu-node-4090` (`10.0.1.25:11433`)
+* `100.64.0.1:11448` &rarr; `gpu-node-4090` (`10.0.1.26:11433`)
 
 Verify connectivity from your local client:
 ```powershell
-curl.exe http://100.99.99.99:11441/api/tags
+curl.exe http://100.64.0.1:11441/api/tags
 ```
 
 ### vLLM Port Forwarding Map
 
 Additional vLLM model servers are exposed on separate ports via the same jump host:
 
-* `100.99.99.99:11455` &rarr; `a6000-155` (`192.168.2.155:11444`) — **DiffusionGemma 26B-A4B FP8** (vLLM, OpenAI-compatible API)
+* `100.64.0.1:11455` &rarr; `gpu-node-3` (`10.0.0.14:11444`) — **DiffusionGemma 26B-A4B FP8** (vLLM, OpenAI-compatible API)
 
 Verify connectivity:
 ```powershell
-curl.exe http://100.99.99.99:11455/v1/models
+curl.exe http://100.64.0.1:11455/v1/models
 ```
 
 ### RDP Access
-* **Jump Host**: `mstsc /v:100.99.99.99` (log in as `James`).
+* **Jump Host**: `mstsc /v:100.64.0.1` (log in as `James`).
 * The internal Linux hosts are Linux/Ubuntu systems; do not use RDP for them unless a desktop service is manually configured.
 
 ## Notes

@@ -574,12 +574,12 @@ function UnslothManagerCard({ host }: { host: any }) {
               </span>
               {proxy ? (
                 <a 
-                  href={`http://100.99.99.99:${proxy.listen_port}`}
+                  href={`http://100.64.0.1:${proxy.listen_port}`}
                   target="_blank"
                   rel="noreferrer"
                   className="font-mono text-indigo-600 text-[11px] truncate bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-100 hover:border-indigo-300 transition-colors cursor-pointer hover:underline"
                 >
-                  100.99.99.99:{proxy.listen_port}
+                  100.64.0.1:{proxy.listen_port}
                 </a>
               ) : (
                 <span className="text-[10px] text-slate-400">Disabled</span>

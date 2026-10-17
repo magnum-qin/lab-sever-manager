@@ -247,7 +247,7 @@ export default function JumpHostDashboard({ clusterHosts }: JumpHostDashboardPro
                 Online
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1 font-mono">Tailscale IP: 100.99.99.99</p>
+            <p className="text-xs text-slate-400 mt-1 font-mono">Tailscale IP: 100.64.0.1</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
@@ -533,7 +533,7 @@ interface AddPortMappingModalProps {
 }
 
 function AddPortMappingModal({ clusterHosts, onClose, onAddComplete }: AddPortMappingModalProps) {
-  const [listenAddress, setListenAddress] = useState('100.99.99.99');
+  const [listenAddress, setListenAddress] = useState('100.64.0.1');
   const [listenPort, setListenPort] = useState('');
   const [connectAddress, setConnectAddress] = useState('');
   const [connectPort, setConnectPort] = useState('11433');
@@ -600,7 +600,7 @@ function AddPortMappingModal({ clusterHosts, onClose, onAddComplete }: AddPortMa
               value={listenAddress}
               onChange={(e) => setListenAddress(e.target.value)}
               className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-slate-700"
-              placeholder="e.g. 100.99.99.99"
+              placeholder="e.g. 100.64.0.1"
               required
             />
           </div>
@@ -770,7 +770,7 @@ function EditPortMappingModal({ clusterHosts, mapping, onClose, onEditComplete }
               value={listenAddress}
               onChange={(e) => setListenAddress(e.target.value)}
               className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-slate-700"
-              placeholder="e.g. 100.99.99.99"
+              placeholder="e.g. 100.64.0.1"
               required
             />
           </div>
